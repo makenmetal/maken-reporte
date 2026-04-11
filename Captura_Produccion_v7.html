@@ -362,7 +362,7 @@ function buildManto(){
   <div class="card">
     <div class="field"><label>Tipo de mantenimiento</label>
       <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
-        ${(CAT.tiposmanto||TIPOS_MANTO).map(t=>`<button class="big-btn${m.tipo===t?" active":""}" data-ns="manto_tipo" data-op="${t}">${t}</button>`).join("")}
+        ${(CAT.tiposmanto||TIPOS_MANTO).map(t=>`<button class="big-btn${m.tipo===t?" active":""}" ontouchstart="selManto('${t}')" onclick="selManto('${t}')">${t}</button>`).join("")}
       </div>
     </div>
     <div class="field"><label>Descripción</label>
@@ -441,6 +441,8 @@ function bindMain(){
   $("sendSetup")?.addEventListener("click",sendSetup);
   $("sendManto")?.addEventListener("click",sendManto);
 }
+
+function selManto(tipo){ S.manto.tipo=tipo; render(); }
 
 function selectParte(ns, parte){
   if(ns.startsWith("prod_parte_")){ const i=parseInt(ns.replace("prod_parte_","")); S.prod.partidas[i].noParte=parte; S.prod.partidas[i].q=parte; S.prod.partidas[i].operacion=""; }
