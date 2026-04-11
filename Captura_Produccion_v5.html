@@ -89,7 +89,13 @@ function getTurno(){
   return (m>=420&&m<1290)?"1ro":"3ro";
 }
 function getFecha(){ return new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}); }
-function getFechaISO(){ return new Date().toISOString().split("T")[0]; }
+function getFechaISO(){ 
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2,'0');
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const y = now.getFullYear();
+  return `${d}/${m}/${y}`;
+}
 function getHora(){ return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); }
 
 function getMaqArea(m){
@@ -214,7 +220,7 @@ function buildResumen(){
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="resumenFecha" value="${r.fecha}" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px">
+        <input type="text" id="resumenFecha" value="${r.fecha}" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">
         <button class="turno-btn${r.turno==="1ro"?" active":""}" data-rturno="1ro">1ro</button>
         <button class="turno-btn${r.turno==="3ro"?" active":""}" data-rturno="3ro">3ro</button>
         <button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="buscarResumen">Buscar</button>
