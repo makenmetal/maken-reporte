@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1D9E75">
+<title>MAKEN METAL — Reporte</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+.wrap { max-width: 480px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
+label { font-size: 14px; color: #666; margin-bottom: 6px; display: block; font-weight: 500; }
+input, textarea { width: 100%; padding: 12px 14px; font-size: 17px; border-radius: 12px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; font-family: inherit; }
+input:focus, textarea:focus { outline: 2px solid #1D9E75; border-color: #1D9E75; }
+.section { margin-bottom: 24px; }
+.card { background: #fff; border-radius: 16px; border: 1px solid #e8e8e8; padding: 1.25rem; margin-bottom: 16px; }
+.area-label { font-size: 13px; color: #888; margin-bottom: 6px; margin-top: 12px; }
+.btn-grid { display: grid; gap: 8px; }
+.big-btn { min-height: 56px; border-radius: 12px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 8px 12px; text-align: center; width: 100%; }
+.big-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; }
+.send-btn { width: 100%; padding: 16px 0; border: none; border-radius: 14px; font-weight: 600; font-size: 18px; cursor: pointer; margin-top: 8px; color: #fff; }
+.send-btn:disabled { opacity: 0.5; }
+.tab-bar { display: flex; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
+.tab-btn { flex: 1; padding: 14px 0; font-size: 15px; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: transparent; color: #888; }
+.tab-btn.active { font-weight: 600; border-bottom-color: #1D9E75; color: #1D9E75; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.turno-btn { padding: 4px 14px; border-radius: 20px; border: 1px solid #ddd; background: transparent; color: #888; font-size: 13px; cursor: pointer; }
+.turno-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; font-weight: 600; }
+.info-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.info-label { font-size: 14px; color: #888; min-width: 110px; }
+.info-val { font-size: 14px; font-weight: 500; }
+.tc-note { font-size: 14px; color: #1D9E75; margin: 8px 0 14px; }
+.torno-note { font-size: 13px; color: #185FA5; margin-bottom: 12px; padding: 6px 10px; background: #E6F1FB; border-radius: 8px; }
+.error-msg { font-size: 14px; color: #E24B4A; margin: 4px 0 10px; }
+.search-results { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 220px; overflow-y: auto; }
+.search-result-btn { width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 500; cursor: pointer; border: 1px solid #eee; border-radius: 10px; background: #fff; color: #1a1a1a; text-align: left; }
+.search-result-btn:active { background: #E1F5EE; }
+.partida-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.del-btn { font-size: 14px; color: #E24B4A; background: none; border: none; cursor: pointer; padding: 4px 8px; }
+.add-btn { width: 100%; padding: 14px 0; background: transparent; border: 1px dashed #bbb; border-radius: 12px; font-size: 15px; color: #888; cursor: pointer; margin-bottom: 8px; }
+.num-input { font-size: 32px !important; font-weight: 600; text-align: center; padding: 16px !important; }
+.field { margin-bottom: 16px; }
+.check-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F5EE; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }
+.history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+.pill { font-size: 13px; padding: 3px 12px; border-radius: 12px; font-weight: 500; }
+.salir { margin-left: 8px; font-size: 11px; color: #E24B4A; background: none; border: none; cursor: pointer; }
+.spinner { text-align: center; padding: 3rem; color: #888; font-size: 16px; }
+textarea { resize: vertical; min-height: 90px; font-size: 16px !important; }
+.selected-parte { font-size: 18px; font-weight: 600; color: #1D9E75; margin: 8px 0 4px; padding: 10px 14px; background: #E1F5EE; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div id="app" class="wrap"><div class="spinner">Cargando catálogos...</div></div>
+<script>
+const SHEETS_URL = "https://script.google.com/a/macros/makenmetal.com.mx/s/AKfycbwBZ4Td2cjH3CbrESY8PVBIop3mcbOtVQrwqN51pjMCKp47YEs4og2uOd-s3ZQ-kLUwUg/exec";
+const OWNER_PIN = "9473";
+
+const AREAS = [
+  { area:"Torno", maquinas:["Puma 1","Puma 2","Haas 1","Haas 2"] },
+  { area:"Centro de Maquinado", maquinas:["Doosan 2","Doosan 3"] },
+  { area:"Corte", maquinas:["Amada"] },
+  { area:"Rectificado Exterior", maquinas:["BSA","Kellen"] },
+  { area:"Rectificado Interior", maquinas:["Okamoto"] },
+  { area:"Ensamble", maquinas:["Ensamble 1"] },
+  { area:"Soldadura", maquinas:["Soldadura 1","Soldadura 2"] },
+  { area:"Detallado", maquinas:["Detallado ZP","Detallado Final"] },
+  { area:"Avellanado", maquinas:["Revolver"] },
+  { area:"Roscado", maquinas:["Machueleadora"] },
+];
+const TIPOS_MANTO = ["Preventivo","Correctivo","Predictivo","Emergencia"];
+
+let CAT = null;
+let S = {
+  view:"loading",
+  empleado:null, loginNum:"", loginError:false,
+  turno:getTurno(), tab:"produccion", sending:false,
+  history:[], submitted:null,
+  prod:{ maquina:"", partidas:[mkPartida()] },
+  setup:{ maquina:"", noParte:"", operacion:"", horas:"", q:"" },
+  manto:{ maquina:"", tipo:"", descripcion:"", horas:"" },
+  resumen:{ fecha:getFechaISO(), turno:getTurno(), loading:false, data:null },
+};
+
+function mkPartida(){ return { noParte:"", operacion:"", piezas:"", q:"" }; }
+
+function getTurno(){
+  const t=new Date(), m=t.getHours()*60+t.getMinutes();
+  return (m>=420&&m<1290)?"1ro":"3ro";
+}
+function getFecha(){ return new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}); }
+function getFechaISO(){ return new Date().toISOString().split("T")[0]; }
+function getHora(){ return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); }
+
+function getMaqArea(m){
+  if(!m) return "";
+  const s=m.toLowerCase();
+  if(s.includes("machueleadora")) return "roscado";
+  if(s.includes("doosan")) return "centro_maquinado";
+  if(s.includes("puma")||s.includes("haas")) return "torno";
+  if(s.includes("okamoto")) return "rect_interior";
+  if(s.includes("bsa")||s.includes("kellen")) return "rect_exterior";
+  if(s.includes("revolver")) return "avellanado";
+  if(s.includes("amada")) return "corte";
+  return "otro";
+}
+function getTipoOp(cod){
+  const n=parseInt(cod);
+  const op=isNaN(n)?CAT.operaciones.find(o=>String(o.codigo).toLowerCase()===String(cod).toLowerCase()):CAT.operaciones.find(o=>parseInt(o.codigo)===n);
+  return op?op.nombre:cod;
+}
+function opLabel(op,maq){
+  const area=getMaqArea(maq);
+  if(op==="50a"&&area==="centro_maquinado"){ const r=CAT.operaciones.find(o=>parseInt(o.codigo)===500); return `${r?r.nombre:"Roscado"} (${op})`; }
+  return `${getTipoOp(op)} (${op})`;
+}
+function getOps(noParte,maq){
+  if(!noParte||!CAT.partes[noParte]) return [];
+  const area=getMaqArea(maq);
+  return Object.keys(CAT.partes[noParte]).filter(op=>!(op==="500a"&&area==="centro_maquinado"));
+}
+async function fetchCat(a){
+  const r=await fetch(`${SHEETS_URL}?action=${a}`,{
+    method:"GET",
+    mode:"cors",
+    redirect:"follow"
+  });
+  return r.json();
+}
+async function enviar(data){ await fetch(SHEETS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); }
+
+function render(){
+  const app=document.getElementById("app");
+  if(S.view==="loading"){ app.innerHTML=`<div class="spinner">Cargando catálogos...</div>`; return; }
+  if(S.view==="login"){ app.innerHTML=buildLogin(); bindLogin(); return; }
+  if(S.view==="done"){ app.innerHTML=buildDone(); bindDone(); return; }
+  if(S.view==="resumen"){ app.innerHTML=buildResumen(); bindResumen(); return; }
+  app.innerHTML=buildMain(); bindMain();
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function buildLogin(){
+  return `<div style="max-width:400px;margin:0 auto;padding:3rem 1.5rem">
+    <p style="font-weight:600;font-size:22px;margin-bottom:4px">MAKEN METAL</p>
+    <p style="font-size:15px;color:#888;margin-bottom:40px">Reporte de producción</p>
+    <label>Número de empleado</label>
+    <input id="loginNum" type="number" inputmode="numeric" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">
+    ${S.loginError?`<p class="error-msg">Número no encontrado.</p>`:""}
+    <button class="send-btn" style="background:#1D9E75" id="loginBtn">Entrar</button>
+  </div>`;
+}
+function bindLogin(){
+  const inp=document.getElementById("loginNum");
+  inp.focus();
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(inp.value); });
+  document.getElementById("loginBtn").addEventListener("click",()=>doLogin(inp.value));
+}
+function doLogin(val){
+  if(String(val).trim()===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
+  const n=parseInt(val), emp=CAT.empleados.find(e=>e.numero===n);
+  if(emp){ S.empleado=emp; S.loginError=false; S.view="main"; render(); }
+  else{ S.loginError=true; render(); }
+}
+
+// ── RESUMEN ───────────────────────────────────────────────────────────────────
+async function cargarResumen(){
+  S.resumen.loading=true; render();
+  try{
+    const fechaLocal=new Date(S.resumen.fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"});
+    const res=await fetch(`${SHEETS_URL}?action=reportes&fecha=${encodeURIComponent(fechaLocal)}&turno=${encodeURIComponent(S.resumen.turno)}`);
+    S.resumen.data=await res.json();
+  }catch(e){ S.resumen.data=[]; }
+  S.resumen.loading=false; render();
+}
+
+function buildResumen(){
+  const r=S.resumen;
+  const rows=r.data||[];
+  const prod=rows.filter(x=>x.tipo==="Producción");
+  const setup=rows.filter(x=>x.tipo==="Setup");
+  const manto=rows.filter(x=>x.tipo==="Mantenimiento");
+  const byMaq={};
+  prod.forEach(row=>{ if(!byMaq[row.maquina]) byMaq[row.maquina]=[]; byMaq[row.maquina].push(row); });
+  const setupByMaq={};
+  setup.forEach(row=>{ if(!setupByMaq[row.maquina]) setupByMaq[row.maquina]=0; setupByMaq[row.maquina]+=parseFloat(row.horasSetup)||0; });
+  const mantoByMaq={};
+  manto.forEach(row=>{ if(!mantoByMaq[row.maquina]) mantoByMaq[row.maquina]={horas:0,tipos:[]}; mantoByMaq[row.maquina].horas+=parseFloat(row.horasManto)||0; if(row.tipoManto&&!mantoByMaq[row.maquina].tipos.includes(row.tipoManto)) mantoByMaq[row.maquina].tipos.push(row.tipoManto); });
+  const allMaq=[...new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)])].sort();
+  const totalPiezas=prod.reduce((a,r)=>a+(parseInt(r.piezas)||0),0);
+  const totalSetup=setup.reduce((a,r)=>a+(parseFloat(r.horasSetup)||0),0);
+  const totalManto=manto.reduce((a,r)=>a+(parseFloat(r.horasManto)||0),0);
+
+  const detalle=allMaq.length===0?`<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>`:
+    allMaq.map(maq=>{
+      const filas=byMaq[maq]||[];
+      const hSetup=setupByMaq[maq];
+      const hManto=mantoByMaq[maq];
+      return `<div class="card" style="margin-bottom:12px">
+        <p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">${maq}</p>
+        ${filas.length?`<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCIÓN</p>
+          ${filas.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">
+            <div><span style="font-size:15px;font-weight:500">${f.noParte}</span><span style="font-size:12px;color:#888;margin-left:6px">${f.tipoOperacion||f.operacion||""}</span></div>
+            <div style="text-align:right"><span style="font-size:20px;font-weight:700">${f.piezas||"—"}</span><span style="font-size:11px;color:#888;display:block">${(f.responsable||"").split(" - ")[0]}</span></div>
+          </div>`).join("")}`:""}
+        ${hSetup?`<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between"><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span><span style="font-size:15px;font-weight:700;color:#185FA5">${hSetup.toFixed(1)} hrs</span></div>`:""}
+        ${hManto?`<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#BA7517;font-weight:500">Manto · ${hManto.tipos.join(", ")}</span><span style="font-size:15px;font-weight:700;color:#BA7517">${hManto.horas.toFixed(1)} hrs</span></div>`:""}
+      </div>`;
+    }).join("");
+
+  return `<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <span style="font-weight:600;font-size:18px">Resumen del turno</span>
+      <button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer" id="salirResumen">Salir</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="resumenFecha" value="${r.fecha}" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px">
+        <button class="turno-btn${r.turno==="1ro"?" active":""}" data-rturno="1ro">1ro</button>
+        <button class="turno-btn${r.turno==="3ro"?" active":""}" data-rturno="3ro">3ro</button>
+        <button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="buscarResumen">Buscar</button>
+      </div>
+    </div>
+    ${r.loading?`<div style="text-align:center;padding:2rem;color:#888;font-size:15px">Cargando...</div>`:`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
+        <p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p>
+        <p style="font-size:28px;font-weight:700;color:#1D9E75">${totalPiezas}</p>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
+        <p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p>
+        <p style="font-size:28px;font-weight:700;color:#185FA5">${totalSetup.toFixed(1)}</p>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
+        <p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p>
+        <p style="font-size:28px;font-weight:700;color:#BA7517">${totalManto.toFixed(1)}</p>
+      </div>
+    </div>
+    ${detalle}`}
+  </div>`;
+}
+function bindResumen(){
+  document.getElementById("salirResumen")?.addEventListener("click",()=>{ S.view="login"; render(); });
+  document.querySelectorAll("[data-rturno]").forEach(b=>b.addEventListener("click",()=>{ S.resumen.turno=b.dataset.rturno; render(); }));
+  document.getElementById("resumenFecha")?.addEventListener("change",e=>{ S.resumen.fecha=e.target.value; });
+  document.getElementById("buscarResumen")?.addEventListener("click",()=>cargarResumen());
+}
+
+// ── DONE ──────────────────────────────────────────────────────────────────────
+function buildDone(){
+  const sub=S.submitted;
+  const hist=S.history.length?`<div style="margin-top:28px">
+    <p style="font-size:14px;color:#888;margin-bottom:10px">Reportes del día</p>
+    ${S.history.map(h=>`<div class="history-item">
+      <div><span style="font-size:15px;font-weight:500">${h.maquina}</span><span style="font-size:13px;color:#888;margin-left:8px">${h.hora}</span></div>
+      <span class="pill" style="background:${h.tipo==='Producción'?'#1D9E7522':h.tipo==='Setup'?'#185FA522':'#BA751722'};color:${h.tipo==='Producción'?'#1D9E75':h.tipo==='Setup'?'#185FA5':'#BA7517'}">${h.tipo}</span>
+    </div>`).join("")}
+  </div>`:"";
+  return `<div style="padding:1.5rem 1.25rem">
+    <div style="text-align:center;margin-bottom:28px">
+      <div class="check-icon">✓</div>
+      <p style="font-weight:600;font-size:20px">Reporte enviado</p>
+      <p style="font-size:14px;color:#888;margin-top:6px">${sub.tipo} · ${sub.fecha} · Turno ${sub.turno}</p>
+    </div>
+    <div class="card">
+      <div class="info-row"><span class="info-label">Máquina</span><span class="info-val">${sub.maquina}</span></div>
+      <div class="info-row"><span class="info-label">Empleado</span><span class="info-val">${S.empleado.nombre}</span></div>
+      ${sub.tipo==="Producción"?sub.partidas.map(p=>`<div style="border-top:1px solid #eee;padding-top:10px;margin-top:10px">
+        <div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">${p.noParte}</span></div>
+        <div class="info-row"><span class="info-label">Operación</span><span class="info-val">${p.operacion?opLabel(p.operacion,sub.maquina):"—"}</span></div>
+        <div class="info-row"><span class="info-label">Piezas</span><span class="info-val">${p.piezas||"—"}</span></div>
+      </div>`).join(""):""}
+      ${sub.tipo==="Setup"?`<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">${sub.noParte}</span></div>
+        <div class="info-row"><span class="info-label">Operación</span><span class="info-val">${sub.operacion?opLabel(sub.operacion,sub.maquina):"—"}</span></div>
+        <div class="info-row"><span class="info-label">Horas setup</span><span class="info-val">${sub.horas||"—"}</span></div>`:""}
+      ${sub.tipo==="Mantenimiento"?`<div class="info-row"><span class="info-label">Tipo</span><span class="info-val">${sub.tipoManto}</span></div>
+        <div class="info-row"><span class="info-label">Descripción</span><span class="info-val">${sub.descripcion||"—"}</span></div>
+        <div class="info-row"><span class="info-label">Horas</span><span class="info-val">${sub.horas||"—"}</span></div>`:""}
+    </div>
+    <button class="send-btn" style="background:#1D9E75" id="nuevoBtn">Nuevo reporte</button>
+    ${hist}
+  </div>`;
+}
+function bindDone(){
+  document.getElementById("nuevoBtn").addEventListener("click",()=>{ S.submitted=null; S.view="main"; render(); });
+}
+
+// ── MAIN ──────────────────────────────────────────────────────────────────────
+function buildMaquinas(selected,ns){
+  return AREAS.map(a=>{
+    const cols=Math.min(a.maquinas.length,2);
+    return `<p class="area-label">${a.area}</p>
+    <div class="btn-grid" style="grid-template-columns:repeat(${cols},1fr)">
+      ${a.maquinas.map(m=>{ const id=`${a.area} — ${m}`; return `<button class="big-btn${selected===id?" active":""}" data-ns="${ns}" data-maq="${id}">${m}</button>`; }).join("")}
+    </div>`;
+  }).join("");
+}
+function buildBuscador(ns,q,noParte){
+  const lista=q.length>1?Object.keys(CAT.partes).sort().filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
+  const selected=noParte?`<div class="selected-parte">✓ ${noParte}</div>`:"";
+  const results=lista.length&&!noParte?`<div class="search-results">${lista.map(p=>`<button class="search-result-btn" data-ns="${ns}" data-parte="${p}">${p}</button>`).join("")}</div>`:"";
+  return `<div class="field"><label>No. de parte</label>
+    <input type="text" inputmode="text" placeholder="Escribe para buscar..." value="${q}" data-search="${ns}" autocomplete="off">
+    ${selected}${results}
+  </div>`;
+}
+function buildOpBtns(ops,selected,maq,ns){
+  if(!ops.length) return "";
+  return `<div class="field"><label>Operación</label>
+    <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
+      ${ops.map(o=>`<button class="big-btn${selected===o?" active":""}" style="font-size:14px" data-ns="${ns}" data-op="${o}">${opLabel(o,maq)}</button>`).join("")}
+    </div>
+  </div>`;
+}
+function buildProd(){
+  const p=S.prod;
+  return `<div class="section"><label>Máquina</label>${buildMaquinas(p.maquina,"prod_maq")}</div>
+  ${p.partidas.map((pt,i)=>{
+    const ops=getOps(pt.noParte,p.maquina);
+    const tc=pt.noParte&&pt.operacion&&CAT.partes[pt.noParte]?.[pt.operacion];
+    const area=getMaqArea(p.maquina);
+    return `<div class="card">
+      <div class="partida-header">
+        <span style="font-size:16px;font-weight:600">Partida ${i+1}</span>
+        ${i>0?`<button class="del-btn" data-del="${i}">Eliminar</button>`:""}
+      </div>
+      ${buildBuscador(`prod_parte_${i}`,pt.q||"",pt.noParte)}
+      ${pt.noParte&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_op_${i}`):""}
+      ${area==="torno"&&pt.operacion==="100a"?`<div class="torno-note">Rectificado Interior en Torno — reportado como 100s</div>`:""}
+      ${tc?`<div class="tc-note">Tiempo de ciclo: <strong>${tc} min</strong></div>`:""}
+      <div class="field"><label>Piezas producidas</label>
+        <input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="${i}" value="${pt.piezas}">
+      </div>
+    </div>`;
+  }).join("")}
+  <button class="add-btn" id="addPartida">+ Agregar otra partida</button>
+  <button class="send-btn" style="background:#1D9E75" id="sendProd" ${S.sending?"disabled":""}>
+    ${S.sending?"Enviando...":"Enviar reporte"}
+  </button>`;
+}
+function buildSetup(){
+  const s=S.setup;
+  const ops=s.noParte&&CAT.partes[s.noParte]?Object.keys(CAT.partes[s.noParte]):[];
+  return `<div class="section"><label>Máquina</label>${buildMaquinas(s.maquina,"setup_maq")}</div>
+  <div class="card">
+    ${buildBuscador("setup_parte",s.q||"",s.noParte)}
+    ${s.noParte&&ops.length?buildOpBtns(ops,s.operacion,s.maquina,"setup_op"):""}
+    <div class="field"><label>Horas de setup</label>
+      <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="${s.horas}" step="0.5">
+    </div>
+  </div>
+  <button class="send-btn" style="background:#185FA5" id="sendSetup" ${S.sending?"disabled":""}>
+    ${S.sending?"Enviando...":"Enviar reporte de setup"}
+  </button>`;
+}
+function buildManto(){
+  const m=S.manto;
+  return `<div class="section"><label>Máquina</label>${buildMaquinas(m.maquina,"manto_maq")}</div>
+  <div class="card">
+    <div class="field"><label>Tipo de mantenimiento</label>
+      <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
+        ${TIPOS_MANTO.map(t=>`<button class="big-btn${m.tipo===t?" active":""}" data-mantotipo="${t}">${t}</button>`).join("")}
+      </div>
+    </div>
+    <div class="field"><label>Descripción</label>
+      <textarea id="mantoDesc" placeholder="Describe el trabajo realizado...">${m.descripcion}</textarea>
+    </div>
+    <div class="field"><label>Horas de mantenimiento</label>
+      <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="mantoHoras" value="${m.horas}" step="0.5">
+    </div>
+  </div>
+  <button class="send-btn" style="background:#BA7517" id="sendManto" ${S.sending?"disabled":""}>
+    ${S.sending?"Enviando...":"Enviar reporte de mantenimiento"}
+  </button>`;
+}
+function buildMain(){
+  const header=`<div class="header">
+    <div style="font-weight:600;font-size:18px">MAKEN METAL</div>
+    <div style="text-align:right">
+      <div style="font-size:13px;margin-bottom:3px">${getFecha()}</div>
+      <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
+        <span style="font-size:13px;color:#888;line-height:26px">Turno</span>
+        <button class="turno-btn${S.turno==="1ro"?" active":""}" data-turno="1ro">1ro</button>
+        <button class="turno-btn${S.turno==="3ro"?" active":""}" data-turno="3ro">3ro</button>
+      </div>
+      <div style="font-size:12px">
+        <span style="color:#888">${S.empleado.numero} · </span>
+        <span style="font-weight:500">${S.empleado.nombre.split(",")[0]}</span>
+        <button class="salir" id="salirBtn">Salir</button>
+      </div>
+    </div>
+  </div>`;
+  const tabs=`<div class="tab-bar">
+    <button class="tab-btn${S.tab==="produccion"?" active":""}" data-tab="produccion">Producción</button>
+    <button class="tab-btn${S.tab==="setup"?" active":""}" data-tab="setup">Setup</button>
+    <button class="tab-btn${S.tab==="manto"?" active":""}" data-tab="manto">Mantenimiento</button>
+  </div>`;
+  return header+tabs+(S.tab==="produccion"?buildProd():S.tab==="setup"?buildSetup():buildManto());
+}
+function bindMain(){
+  const $=id=>document.getElementById(id);
+  const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn));
+  $("salirBtn")?.addEventListener("click",()=>{ S.empleado=null; S.view="login"; render(); });
+  on(".tab-btn","click",e=>{ S.tab=e.currentTarget.dataset.tab; render(); });
+  on(".turno-btn","click",e=>{ S.turno=e.currentTarget.dataset.turno; render(); });
+  on("[data-maq]","click",e=>{
+    const ns=e.currentTarget.dataset.ns, maq=e.currentTarget.dataset.maq;
+    if(ns==="prod_maq") S.prod.maquina=maq;
+    else if(ns==="setup_maq") S.setup.maquina=maq;
+    else if(ns==="manto_maq") S.manto.maquina=maq;
+    render();
+  });
+  on("[data-search]","input",e=>{
+    const ns=e.currentTarget.dataset.search, q=e.currentTarget.value;
+    if(ns.startsWith("prod_parte_")){ const i=parseInt(ns.replace("prod_parte_","")); S.prod.partidas[i].q=q; S.prod.partidas[i].noParte=""; S.prod.partidas[i].operacion=""; }
+    else if(ns==="setup_parte"){ S.setup.q=q; S.setup.noParte=""; S.setup.operacion=""; }
+    updateResults(ns,q);
+  });
+  on("[data-parte]","click",e=>{ selectParte(e.currentTarget.dataset.ns, e.currentTarget.dataset.parte); });
+  on("[data-op]","click",e=>{
+    const ns=e.currentTarget.dataset.ns, op=e.currentTarget.dataset.op;
+    if(ns.startsWith("prod_op_")){ const i=parseInt(ns.replace("prod_op_","")); S.prod.partidas[i].operacion=op; }
+    else if(ns==="setup_op") S.setup.operacion=op;
+    render();
+  });
+  on("[data-piezas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
+  $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
+  $("mantoDesc")?.addEventListener("input",e=>S.manto.descripcion=e.currentTarget.value);
+  $("mantoHoras")?.addEventListener("input",e=>S.manto.horas=e.currentTarget.value);
+  on("[data-mantotipo]","click",e=>{ S.manto.tipo=e.currentTarget.dataset.mantotipo; render(); });
+  $("addPartida")?.addEventListener("click",()=>{ S.prod.partidas.push(mkPartida()); render(); });
+  on("[data-del]","click",e=>{ S.prod.partidas.splice(parseInt(e.currentTarget.dataset.del),1); render(); });
+  $("sendProd")?.addEventListener("click",sendProd);
+  $("sendSetup")?.addEventListener("click",sendSetup);
+  $("sendManto")?.addEventListener("click",sendManto);
+}
+
+function selectParte(ns, parte){
+  if(ns.startsWith("prod_parte_")){ const i=parseInt(ns.replace("prod_parte_","")); S.prod.partidas[i].noParte=parte; S.prod.partidas[i].q=parte; S.prod.partidas[i].operacion=""; }
+  else if(ns==="setup_parte"){ S.setup.noParte=parte; S.setup.q=parte; S.setup.operacion=""; }
+  render();
+}
+
+function updateResults(ns,q){
+  const lista=q.length>1?Object.keys(CAT.partes).sort().filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
+  const inputs=document.querySelectorAll(`[data-search="${ns}"]`);
+  if(!inputs.length) return;
+  const wrap=inputs[0].closest(".field");
+  if(!wrap) return;
+  let sel=wrap.querySelector(".selected-parte");
+  if(sel) sel.remove();
+  let div=wrap.querySelector(".search-results");
+  if(!lista.length){ if(div) div.remove(); return; }
+  if(!div){ div=document.createElement("div"); div.className="search-results"; wrap.appendChild(div); }
+  div.innerHTML=lista.map(p=>`<button class="search-result-btn" data-ns="${ns}" data-parte="${p}">${p}</button>`).join("");
+  div.querySelectorAll("[data-parte]").forEach(btn=>btn.addEventListener("click",()=>selectParte(btn.dataset.ns,btn.dataset.parte)));
+}
+
+async function sendProd(){
+  if(!S.prod.maquina||!S.prod.partidas[0].noParte) return;
+  S.sending=true; render();
+  const fecha=getFecha(), hora=getHora();
+  for(const pt of S.prod.partidas){
+    if(!pt.noParte) continue;
+    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:pt.piezas,horasSetup:"",horasManto:"",tipoManto:"",descripcion:""});
+  }
+  S.history.unshift({tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina});
+  S.submitted={tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina,partidas:[...S.prod.partidas]};
+  S.prod={maquina:"",partidas:[mkPartida()]};
+  S.sending=false; S.view="done"; render();
+}
+async function sendSetup(){
+  if(!S.setup.maquina||!S.setup.noParte) return;
+  S.sending=true; render();
+  const fecha=getFecha(), hora=getHora();
+  await enviar({fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:S.setup.noParte,tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""});
+  S.history.unshift({tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina});
+  S.submitted={tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina,noParte:S.setup.noParte,operacion:S.setup.operacion,horas:S.setup.horas};
+  S.setup={maquina:"",noParte:"",operacion:"",horas:"",q:""};
+  S.sending=false; S.view="done"; render();
+}
+async function sendManto(){
+  if(!S.manto.maquina||!S.manto.tipo) return;
+  S.sending=true; render();
+  const fecha=getFecha(), hora=getHora();
+  await enviar({fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion});
+  S.history.unshift({tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina});
+  S.submitted={tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion,horas:S.manto.horas};
+  S.manto={maquina:"",tipo:"",descripcion:"",horas:""};
+  S.sending=false; S.view="done"; render();
+}
+
+Promise.all([fetchCat("empleados"),fetchCat("operaciones"),fetchCat("partes")])
+  .then(([empleados,operaciones,partes])=>{ CAT={empleados,operaciones,partes}; S.view="login"; render(); })
+  .catch(()=>{ document.getElementById("app").innerHTML=`<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catálogos. Verifica conexión.</div>`; });
+</script>
+</body>
+</html>
