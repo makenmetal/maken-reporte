@@ -17,15 +17,15 @@ input:focus, textarea:focus { outline: 2px solid #1D9E75; border-color: #1D9E75;
 .card { background: #fff; border-radius: 16px; border: 1px solid #e8e8e8; padding: 1.25rem; margin-bottom: 16px; }
 .area-label { font-size: 13px; color: #888; margin-bottom: 6px; margin-top: 12px; }
 .btn-grid { display: grid; gap: 8px; }
-.big-btn { min-height: 56px; border-radius: 12px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 8px 12px; text-align: center; width: 100%; }
+.big-btn { min-height: 56px; border-radius: 12px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 8px 12px; text-align: center; width: 100%; user-select: none; -webkit-user-select: none; }
 .big-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; }
 .send-btn { width: 100%; padding: 16px 0; border: none; border-radius: 14px; font-weight: 600; font-size: 18px; cursor: pointer; margin-top: 8px; color: #fff; }
 .send-btn:disabled { opacity: 0.5; }
 .tab-bar { display: flex; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; }
-.tab-btn { flex: 1; padding: 14px 0; font-size: 15px; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: transparent; color: #888; }
+.tab-btn { flex: 1; padding: 14px 0; font-size: 15px; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: transparent; color: #888; user-select: none; -webkit-user-select: none; }
 .tab-btn.active { font-weight: 600; border-bottom-color: #1D9E75; color: #1D9E75; }
 .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-.turno-btn { padding: 4px 14px; border-radius: 20px; border: 1px solid #ddd; background: transparent; color: #888; font-size: 13px; cursor: pointer; }
+.turno-btn { padding: 4px 14px; border-radius: 20px; border: 1px solid #ddd; background: transparent; color: #888; font-size: 13px; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .turno-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; font-weight: 600; }
 .info-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .info-label { font-size: 14px; color: #888; min-width: 110px; }
@@ -37,7 +37,7 @@ input:focus, textarea:focus { outline: 2px solid #1D9E75; border-color: #1D9E75;
 .search-result-btn { width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 500; cursor: pointer; border: 1px solid #eee; border-radius: 10px; background: #fff; color: #1a1a1a; text-align: left; }
 .search-result-btn:active { background: #E1F5EE; }
 .partida-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.del-btn { font-size: 14px; color: #E24B4A; background: none; border: none; cursor: pointer; padding: 4px 8px; }
+.del-btn { font-size: 14px; color: #E24B4A; background: none; border: none; cursor: pointer; padding: 8px; }
 .add-btn { width: 100%; padding: 14px 0; background: transparent; border: 1px dashed #bbb; border-radius: 12px; font-size: 15px; color: #888; cursor: pointer; margin-bottom: 8px; }
 .num-input { font-size: 32px !important; font-weight: 600; text-align: center; padding: 16px !important; }
 .field { margin-bottom: 16px; }
@@ -68,7 +68,7 @@ const AREAS = [
   { area:"Avellanado", maquinas:["Revolver"] },
   { area:"Roscado", maquinas:["Machueleadora"] },
 ];
-const TIPOS_MANTO = ["Preventivo","Correctivo","Predictivo","Emergencia"];
+const TIPOS_MANTO_DEFAULT = ["Preventivo","Correctivo","Predictivo","Emergencia"];
 
 let CAT = null;
 let S = {
@@ -88,13 +88,12 @@ function getTurno(){
   const t=new Date(), m=t.getHours()*60+t.getMinutes();
   return (m>=420&&m<1290)?"1ro":"3ro";
 }
-function getFecha(){ return new Date().toLocaleDateString("es-MX",{day:"2-digit",month:"2-digit",year:"numeric"}); }
+function getFecha(){ return S.fechaManual || getFechaHoy(); }
 function getFechaHoy(){
   const now=new Date();
   const d=String(now.getDate()).padStart(2,'0');
   const m=String(now.getMonth()+1).padStart(2,'0');
-  const y=now.getFullYear();
-  return `${d}/${m}/${y}`;
+  return `${d}/${m}/${now.getFullYear()}`;
 }
 function getHora(){ return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); }
 
@@ -121,17 +120,14 @@ function opLabel(op,maq){
   return `${getTipoOp(op)} (${op})`;
 }
 function getOps(noParte,maq){
-  if(!noParte||!CAT.partes[noParte]) return [];
+  if(!noParte||noParte==="Otro"||!CAT.partes[noParte]) return [];
   const area=getMaqArea(maq);
   return Object.keys(CAT.partes[noParte]).filter(op=>!(op==="500a"&&area==="centro_maquinado"));
 }
-async function fetchCat(a){
-  const r=await fetch(`${SHEETS_URL}?action=${a}`,{method:"GET",mode:"cors",redirect:"follow"});
-  return r.json();
-}
-async function enviar(data){
-  await fetch(SHEETS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
-}
+function tiposManto(){ return (CAT&&CAT.tiposmanto&&CAT.tiposmanto.length)?CAT.tiposmanto:TIPOS_MANTO_DEFAULT; }
+
+async function fetchCat(a){ const r=await fetch(`${SHEETS_URL}?action=${a}`,{method:"GET",mode:"cors",redirect:"follow"}); return r.json(); }
+async function enviar(data){ await fetch(SHEETS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); }
 async function cargarResumen(){
   S.resumen.loading=true; render();
   try{
@@ -141,15 +137,49 @@ async function cargarResumen(){
   S.resumen.loading=false; render();
 }
 
+// ── Funciones globales para eventos inline ────────────────────────────────────
+function setTab(t){ S.tab=t; render(); }
+function setTurno(t){ S.turno=t; render(); }
+function setMaq(ns,maq){
+  if(ns==="prod") S.prod.maquina=maq;
+  else if(ns==="setup") S.setup.maquina=maq;
+  else if(ns==="manto") S.manto.maquina=maq;
+  render();
+}
+function setOp(ns,op){
+  if(ns.startsWith("prod_")){ const i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].operacion=op; }
+  else if(ns==="setup") S.setup.operacion=op;
+  render();
+}
+function setMantoTipo(t){ S.manto.tipo=t; render(); }
+function selParte(ns,parte){
+  if(ns.startsWith("prod_")){ const i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].noParte=parte; S.prod.partidas[i].q=parte; S.prod.partidas[i].operacion=""; }
+  else if(ns==="setup"){ S.setup.noParte=parte; S.setup.q=parte; S.setup.operacion=""; }
+  render();
+}
+function delPartida(i){ S.prod.partidas.splice(i,1); render(); }
+function addPartida(){ S.prod.partidas.push(mkPartida()); render(); }
+function doSalir(){ S.empleado=null; S.view="login"; render(); }
+function doNuevo(){ S.submitted=null; S.view="main"; render(); }
+function doSalirResumen(){ S.view="login"; render(); }
+function setRTurno(t){ S.resumen.turno=t; render(); }
+function doBuscarResumen(){
+  const inp=document.getElementById("resumenFecha");
+  if(inp) S.resumen.fecha=inp.value;
+  cargarResumen();
+}
+function selManto(t){ S.manto.tipo=t; render(); }
+
 function render(){
   const app=document.getElementById("app");
   if(S.view==="loading"){ app.innerHTML=`<div class="spinner">Cargando catálogos...</div>`; return; }
   if(S.view==="login"){ app.innerHTML=buildLogin(); bindLogin(); return; }
-  if(S.view==="done"){ app.innerHTML=buildDone(); bindDone(); return; }
+  if(S.view==="done"){ app.innerHTML=buildDone(); return; }
   if(S.view==="resumen"){ app.innerHTML=buildResumen(); bindResumen(); return; }
   app.innerHTML=buildMain(); bindMain();
 }
 
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 function buildLogin(){
   return `<div style="max-width:400px;margin:0 auto;padding:3rem 1.5rem">
     <p style="font-weight:600;font-size:22px;margin-bottom:4px">MAKEN METAL</p>
@@ -157,14 +187,13 @@ function buildLogin(){
     <label>Número de empleado</label>
     <input id="loginNum" type="number" inputmode="numeric" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">
     ${S.loginError?`<p class="error-msg">Número no encontrado.</p>`:""}
-    <button class="send-btn" style="background:#1D9E75" id="loginBtn">Entrar</button>
+    <button class="send-btn" style="background:#1D9E75" onclick="doLogin(document.getElementById('loginNum').value)">Entrar</button>
   </div>`;
 }
 function bindLogin(){
   const inp=document.getElementById("loginNum");
   inp.focus();
   inp.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(inp.value); });
-  document.getElementById("loginBtn").addEventListener("click",()=>doLogin(inp.value));
 }
 function doLogin(val){
   if(String(val).trim()===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
@@ -173,6 +202,7 @@ function doLogin(val){
   else{ S.loginError=true; render(); }
 }
 
+// ── RESUMEN ───────────────────────────────────────────────────────────────────
 function buildResumen(){
   const r=S.resumen;
   const rows=r.data||[];
@@ -189,12 +219,9 @@ function buildResumen(){
   const totalPiezas=prod.reduce((a,r)=>a+(parseInt(r.piezas)||0),0);
   const totalSetup=setup.reduce((a,r)=>a+(parseFloat(r.horasSetup)||0),0);
   const totalManto=manto.reduce((a,r)=>a+(parseFloat(r.horasManto)||0),0);
-
   const detalle=allMaq.length===0?`<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>`:
     allMaq.map(maq=>{
-      const filas=byMaq[maq]||[];
-      const hSetup=setupByMaq[maq];
-      const hManto=mantoByMaq[maq];
+      const filas=byMaq[maq]||[], hSetup=setupByMaq[maq], hManto=mantoByMaq[maq];
       return `<div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">${maq}</p>
         ${filas.length?`<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCIÓN</p>
@@ -206,48 +233,33 @@ function buildResumen(){
         ${hManto?`<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#BA7517;font-weight:500">Manto · ${hManto.tipos.join(", ")}</span><span style="font-size:15px;font-weight:700;color:#BA7517">${hManto.horas.toFixed(1)} hrs</span></div>`:""}
       </div>`;
     }).join("");
-
   return `<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <span style="font-weight:600;font-size:18px">Resumen del turno</span>
-      <button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer" id="salirResumen">Salir</button>
+      <button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" onclick="doSalirResumen()">Salir</button>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" id="resumenFecha" value="${r.fecha}" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">
-        <button class="turno-btn${r.turno==="1ro"?" active":""}" data-rturno="1ro">1ro</button>
-        <button class="turno-btn${r.turno==="3ro"?" active":""}" data-rturno="3ro">3ro</button>
-        <button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="buscarResumen">Buscar</button>
+        <button class="turno-btn${r.turno==="1ro"?" active":""}" onclick="setRTurno('1ro')">1ro</button>
+        <button class="turno-btn${r.turno==="3ro"?" active":""}" onclick="setRTurno('3ro')">3ro</button>
+        <button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" onclick="doBuscarResumen()">Buscar</button>
       </div>
     </div>
     ${r.loading?`<div style="text-align:center;padding:2rem;color:#888;font-size:15px">Cargando...</div>`:`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
-        <p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p>
-        <p style="font-size:28px;font-weight:700;color:#1D9E75">${totalPiezas}</p>
-      </div>
-      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
-        <p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p>
-        <p style="font-size:28px;font-weight:700;color:#185FA5">${totalSetup.toFixed(1)}</p>
-      </div>
-      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee">
-        <p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p>
-        <p style="font-size:28px;font-weight:700;color:#BA7517">${totalManto.toFixed(1)}</p>
-      </div>
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:28px;font-weight:700;color:#1D9E75">${totalPiezas}</p></div>
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">${totalSetup.toFixed(1)}</p></div>
+      <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">${totalManto.toFixed(1)}</p></div>
     </div>
     ${detalle}`}
   </div>`;
 }
 function bindResumen(){
-  document.getElementById("salirResumen")?.addEventListener("click",()=>{ S.view="login"; render(); });
-  document.querySelectorAll("[data-rturno]").forEach(b=>b.addEventListener("click",()=>{ S.resumen.turno=b.dataset.rturno; render(); }));
   document.getElementById("resumenFecha")?.addEventListener("change",e=>{ S.resumen.fecha=e.target.value; });
-  document.getElementById("buscarResumen")?.addEventListener("click",()=>{
-    S.resumen.fecha=document.getElementById("resumenFecha").value;
-    cargarResumen();
-  });
 }
 
+// ── DONE ──────────────────────────────────────────────────────────────────────
 function buildDone(){
   const sub=S.submitted;
   const hist=S.history.length?`<div style="margin-top:28px">
@@ -270,6 +282,7 @@ function buildDone(){
         <div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">${p.noParte}</span></div>
         <div class="info-row"><span class="info-label">Operación</span><span class="info-val">${p.operacion?opLabel(p.operacion,sub.maquina):"—"}</span></div>
         <div class="info-row"><span class="info-label">Piezas</span><span class="info-val">${p.piezas||"—"}</span></div>
+        ${p.noParte==="Otro"?`<div class="info-row"><span class="info-label">Horas</span><span class="info-val">${p.horas||"—"}</span></div>`:""}
       </div>`).join(""):""}
       ${sub.tipo==="Setup"?`<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">${sub.noParte}</span></div>
         <div class="info-row"><span class="info-label">Operación</span><span class="info-val">${sub.operacion?opLabel(sub.operacion,sub.maquina):"—"}</span></div>
@@ -278,76 +291,85 @@ function buildDone(){
         <div class="info-row"><span class="info-label">Descripción</span><span class="info-val">${sub.descripcion||"—"}</span></div>
         <div class="info-row"><span class="info-label">Horas</span><span class="info-val">${sub.horas||"—"}</span></div>`:""}
     </div>
-    <button class="send-btn" style="background:#1D9E75" id="nuevoBtn">Nuevo reporte</button>
+    <button class="send-btn" style="background:#1D9E75" onclick="doNuevo()">Nuevo reporte</button>
     ${hist}
   </div>`;
 }
-function bindDone(){
-  document.getElementById("nuevoBtn").addEventListener("click",()=>{ S.submitted=null; S.view="main"; render(); });
-}
 
-function buildMaquinas(selected,ns){
+// ── MAIN ──────────────────────────────────────────────────────────────────────
+function buildMaquinas(ns){
+  const selected = ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:S.manto.maquina;
   return AREAS.map(a=>{
     const cols=Math.min(a.maquinas.length,2);
     return `<p class="area-label">${a.area}</p>
     <div class="btn-grid" style="grid-template-columns:repeat(${cols},1fr)">
-      ${a.maquinas.map(m=>{ return `<button class="big-btn${selected===m?" active":""}" data-ns="${ns}" data-maq="${m}">${m}</button>`; }).join("")}
+      ${a.maquinas.map(m=>`<button class="big-btn${selected===m?" active":""}" onclick="setMaq('${ns}','${m}')">${m}</button>`).join("")}
     </div>`;
   }).join("");
 }
+
 function buildBuscador(ns,q,noParte){
   const lista=q.length>1?Object.keys(CAT.partes).sort().filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
   const selected=noParte?`<div class="selected-parte">✓ ${noParte}</div>`:"";
-  const results=lista.length&&!noParte?`<div class="search-results">${lista.map(p=>`<button class="search-result-btn" data-ns="${ns}" data-parte="${p}">${p}</button>`).join("")}</div>`:"";
+  const results=lista.length&&!noParte?`<div class="search-results">${lista.map(p=>`<button class="search-result-btn" onclick="selParte('${ns}','${p}')">${p}</button>`).join("")}</div>`:"";
   return `<div class="field"><label>No. de parte</label>
     <input type="text" inputmode="text" placeholder="Escribe para buscar..." value="${q}" data-search="${ns}" autocomplete="off">
     ${selected}${results}
   </div>`;
 }
+
 function buildOpBtns(ops,selected,maq,ns){
   if(!ops.length) return "";
   return `<div class="field"><label>Operación</label>
     <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
-      ${ops.map(o=>`<button class="big-btn${selected===o?" active":""}" style="font-size:14px" data-ns="${ns}" data-op="${o}">${opLabel(o,maq)}</button>`).join("")}
+      ${ops.map(o=>`<button class="big-btn${selected===o?" active":""}" style="font-size:14px" onclick="setOp('${ns}','${o}')">${opLabel(o,maq)}</button>`).join("")}
     </div>
   </div>`;
 }
+
 function buildProd(){
   const p=S.prod;
-  return `<div class="section"><label>Máquina</label>${buildMaquinas(p.maquina,"prod_maq")}</div>
+  return `<div class="section"><label>Máquina</label>${buildMaquinas("prod")}</div>
   ${p.partidas.map((pt,i)=>{
     const ops=getOps(pt.noParte,p.maquina);
-    const tc=pt.noParte&&pt.operacion&&CAT.partes[pt.noParte]?.[pt.operacion];
+    const tc=pt.noParte&&pt.noParte!=="Otro"&&pt.operacion&&CAT.partes[pt.noParte]?.[pt.operacion];
     const area=getMaqArea(p.maquina);
+    const esOtro=pt.noParte==="Otro";
     return `<div class="card">
       <div class="partida-header">
         <span style="font-size:16px;font-weight:600">Partida ${i+1}</span>
-        ${i>0?`<button class="del-btn" data-del="${i}">Eliminar</button>`:""}
+        ${i>0?`<button class="del-btn" onclick="delPartida(${i})">Eliminar</button>`:""}
       </div>
-      ${buildBuscador(`prod_parte_${i}`,pt.q||"",pt.noParte)}
-      ${pt.noParte&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_op_${i}`):""}
+      ${buildBuscador(`prod_${i}`,pt.q||"",pt.noParte)}
+      ${pt.noParte&&!esOtro&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_${i}`):""}
+      ${esOtro?`<div class="field"><label>Operación</label>
+        <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
+          ${CAT.operaciones.map(o=>`<button class="big-btn${pt.operacion===o.codigo?" active":""}" style="font-size:14px" onclick="setOp('prod_${i}','${o.codigo}')">${o.nombre}</button>`).join("")}
+        </div>
+      </div>`:""}
       ${area==="torno"&&pt.operacion==="100a"?`<div class="torno-note">Rectificado Interior en Torno — reportado como 100s</div>`:""}
       ${tc?`<div class="tc-note">Tiempo de ciclo: <strong>${tc} min</strong></div>`:""}
-      <div class="field"><label>Piezas producidas</label>
+      <div class="field"><label>Piezas</label>
         <input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="${i}" value="${pt.piezas}">
       </div>
-      ${pt.noParte==="Otro"?`<div class="field"><label>Horas</label>
+      ${esOtro?`<div class="field"><label>Horas</label>
         <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="${i}" value="${pt.horas||""}" step="0.5">
       </div>`:""}
     </div>`;
   }).join("")}
-  <button class="add-btn" id="addPartida">+ Agregar otra partida</button>
+  <button class="add-btn" onclick="addPartida()">+ Agregar otra partida</button>
   <button class="send-btn" style="background:#1D9E75" id="sendProd" ${S.sending?"disabled":""}>
     ${S.sending?"Enviando...":"Enviar reporte"}
   </button>`;
 }
+
 function buildSetup(){
   const s=S.setup;
-  const ops=s.noParte&&CAT.partes[s.noParte]?Object.keys(CAT.partes[s.noParte]):[];
-  return `<div class="section"><label>Máquina</label>${buildMaquinas(s.maquina,"setup_maq")}</div>
+  const ops=s.noParte&&s.noParte!=="Otro"&&CAT.partes[s.noParte]?Object.keys(CAT.partes[s.noParte]):[];
+  return `<div class="section"><label>Máquina</label>${buildMaquinas("setup")}</div>
   <div class="card">
-    ${buildBuscador("setup_parte",s.q||"",s.noParte)}
-    ${s.noParte&&ops.length?buildOpBtns(ops,s.operacion,s.maquina,"setup_op"):""}
+    ${buildBuscador("setup",s.q||"",s.noParte)}
+    ${s.noParte&&ops.length?buildOpBtns(ops,s.operacion,s.maquina,"setup"):""}
     <div class="field"><label>Horas de setup</label>
       <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="${s.horas}" step="0.5">
     </div>
@@ -356,13 +378,14 @@ function buildSetup(){
     ${S.sending?"Enviando...":"Enviar reporte de setup"}
   </button>`;
 }
+
 function buildManto(){
   const m=S.manto;
-  return `<div class="section"><label>Máquina</label>${buildMaquinas(m.maquina,"manto_maq")}</div>
+  return `<div class="section"><label>Máquina</label>${buildMaquinas("manto")}</div>
   <div class="card">
     <div class="field"><label>Tipo de mantenimiento</label>
       <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
-        ${(CAT.tiposmanto||TIPOS_MANTO).map(t=>`<button class="big-btn${m.tipo===t?" active":""}" ontouchstart="selManto('${t}')" onclick="selManto('${t}')">${t}</button>`).join("")}
+        ${tiposManto().map(t=>`<button class="big-btn${m.tipo===t?" active":""}" onclick="selManto('${t}')">${t}</button>`).join("")}
       </div>
     </div>
     <div class="field"><label>Descripción</label>
@@ -376,78 +399,57 @@ function buildManto(){
     ${S.sending?"Enviando...":"Enviar reporte de mantenimiento"}
   </button>`;
 }
+
 function buildMain(){
+  const fecha=getFecha();
   const header=`<div class="header">
     <div style="font-weight:600;font-size:18px">MAKEN METAL</div>
     <div style="text-align:right">
       <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px;align-items:center">
-        <input type="text" id="fechaInput" value="${S.fechaManual||getFecha()}" placeholder="dd/mm/yyyy" style="width:100px;font-size:12px;padding:4px 6px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff">
+        <input type="text" id="fechaInput" value="${fecha}" placeholder="dd/mm/yyyy" style="width:105px;font-size:12px;padding:4px 6px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff">
       </div>
       <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
         <span style="font-size:13px;color:#888;line-height:26px">Turno</span>
-        <button class="turno-btn${S.turno==="1ro"?" active":""}" data-turno="1ro">1ro</button>
-        <button class="turno-btn${S.turno==="3ro"?" active":""}" data-turno="3ro">3ro</button>
+        <button class="turno-btn${S.turno==="1ro"?" active":""}" onclick="setTurno('1ro')">1ro</button>
+        <button class="turno-btn${S.turno==="3ro"?" active":""}" onclick="setTurno('3ro')">3ro</button>
       </div>
       <div style="font-size:12px">
         <span style="color:#888">${S.empleado.numero} · </span>
         <span style="font-weight:500">${S.empleado.nombre.split(",")[0]}</span>
-        <button class="salir" id="salirBtn">Salir</button>
+        <button class="salir" onclick="doSalir()">Salir</button>
       </div>
     </div>
   </div>`;
   const tabs=`<div class="tab-bar">
-    <button class="tab-btn${S.tab==="produccion"?" active":""}" data-tab="produccion">Producción</button>
-    <button class="tab-btn${S.tab==="setup"?" active":""}" data-tab="setup">Setup</button>
-    <button class="tab-btn${S.tab==="manto"?" active":""}" data-tab="manto">Mantenimiento</button>
+    <button class="tab-btn${S.tab==="produccion"?" active":""}" onclick="setTab('produccion')">Producción</button>
+    <button class="tab-btn${S.tab==="setup"?" active":""}" onclick="setTab('setup')">Setup</button>
+    <button class="tab-btn${S.tab==="manto"?" active":""}" onclick="setTab('manto')">Mantenimiento</button>
   </div>`;
   return header+tabs+(S.tab==="produccion"?buildProd():S.tab==="setup"?buildSetup():buildManto());
 }
+
 function bindMain(){
   const $=id=>document.getElementById(id);
   const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn));
-  $("salirBtn")?.addEventListener("click",()=>{ S.empleado=null; S.view="login"; render(); });
+
   $("fechaInput")?.addEventListener("change",e=>{ S.fechaManual=e.target.value; });
-  on(".tab-btn","click",e=>{ S.tab=e.currentTarget.dataset.tab; render(); });
-  on(".turno-btn","click",e=>{ S.turno=e.currentTarget.dataset.turno; render(); });
-  on("[data-maq]","click",e=>{
-    const ns=e.currentTarget.dataset.ns, maq=e.currentTarget.dataset.maq;
-    if(ns==="prod_maq") S.prod.maquina=maq;
-    else if(ns==="setup_maq") S.setup.maquina=maq;
-    else if(ns==="manto_maq") S.manto.maquina=maq;
-    render();
-  });
+
   on("[data-search]","input",e=>{
     const ns=e.currentTarget.dataset.search, q=e.currentTarget.value;
-    if(ns.startsWith("prod_parte_")){ const i=parseInt(ns.replace("prod_parte_","")); S.prod.partidas[i].q=q; S.prod.partidas[i].noParte=""; S.prod.partidas[i].operacion=""; }
-    else if(ns==="setup_parte"){ S.setup.q=q; S.setup.noParte=""; S.setup.operacion=""; }
+    if(ns.startsWith("prod_")){ const i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].q=q; S.prod.partidas[i].noParte=""; S.prod.partidas[i].operacion=""; }
+    else if(ns==="setup"){ S.setup.q=q; S.setup.noParte=""; S.setup.operacion=""; }
     updateResults(ns,q);
   });
-  on("[data-parte]","click",e=>{ selectParte(e.currentTarget.dataset.ns, e.currentTarget.dataset.parte); });
-  on("[data-op]","click",e=>{
-    const ns=e.currentTarget.dataset.ns, op=e.currentTarget.dataset.op;
-    if(ns.startsWith("prod_op_")){ const i=parseInt(ns.replace("prod_op_","")); S.prod.partidas[i].operacion=op; }
-    else if(ns==="setup_op") S.setup.operacion=op;
-    render();
-  });
+
   on("[data-piezas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
   on("[data-horas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
   $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
   $("mantoDesc")?.addEventListener("input",e=>S.manto.descripcion=e.currentTarget.value);
   $("mantoHoras")?.addEventListener("input",e=>S.manto.horas=e.currentTarget.value);
-  on("[data-mantotipo]","click",e=>{ S.manto.tipo=e.currentTarget.dataset.mantotipo; render(); });
-  $("addPartida")?.addEventListener("click",()=>{ S.prod.partidas.push(mkPartida()); render(); });
-  on("[data-del]","click",e=>{ S.prod.partidas.splice(parseInt(e.currentTarget.dataset.del),1); render(); });
+
   $("sendProd")?.addEventListener("click",sendProd);
   $("sendSetup")?.addEventListener("click",sendSetup);
   $("sendManto")?.addEventListener("click",sendManto);
-}
-
-function selManto(tipo){ S.manto.tipo=tipo; render(); }
-
-function selectParte(ns, parte){
-  if(ns.startsWith("prod_parte_")){ const i=parseInt(ns.replace("prod_parte_","")); S.prod.partidas[i].noParte=parte; S.prod.partidas[i].q=parte; S.prod.partidas[i].operacion=""; }
-  else if(ns==="setup_parte"){ S.setup.noParte=parte; S.setup.q=parte; S.setup.operacion=""; }
-  render();
 }
 
 function updateResults(ns,q){
@@ -456,22 +458,21 @@ function updateResults(ns,q){
   if(!inputs.length) return;
   const wrap=inputs[0].closest(".field");
   if(!wrap) return;
-  let sel=wrap.querySelector(".selected-parte");
-  if(sel) sel.remove();
+  let sel=wrap.querySelector(".selected-parte"); if(sel) sel.remove();
   let div=wrap.querySelector(".search-results");
   if(!lista.length){ if(div) div.remove(); return; }
   if(!div){ div=document.createElement("div"); div.className="search-results"; wrap.appendChild(div); }
-  div.innerHTML=lista.map(p=>`<button class="search-result-btn" data-ns="${ns}" data-parte="${p}">${p}</button>`).join("");
-  div.querySelectorAll("[data-parte]").forEach(btn=>btn.addEventListener("click",()=>selectParte(btn.dataset.ns,btn.dataset.parte)));
+  div.innerHTML=lista.map(p=>`<button class="search-result-btn" onclick="selParte('${ns}','${p}')">${p}</button>`).join("");
 }
 
 async function sendProd(){
   if(!S.prod.maquina||!S.prod.partidas[0].noParte) return;
   S.sending=true; render();
-  const fecha=S.fechaManual||getFecha(), hora=getHora();
+  const fecha=getFecha(), hora=getHora();
   for(const pt of S.prod.partidas){
     if(!pt.noParte) continue;
-    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:pt.noParte==="Otro"?"":pt.piezas,horasSetup:pt.noParte==="Otro"?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
+    const esOtro=pt.noParte==="Otro";
+    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
   }
   S.history.unshift({tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina});
   S.submitted={tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina,partidas:[...S.prod.partidas]};
@@ -481,7 +482,7 @@ async function sendProd(){
 async function sendSetup(){
   if(!S.setup.maquina||!S.setup.noParte) return;
   S.sending=true; render();
-  const fecha=S.fechaManual||getFecha(), hora=getHora();
+  const fecha=getFecha(), hora=getHora();
   await enviar({fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:S.setup.noParte,tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""});
   S.history.unshift({tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina});
   S.submitted={tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina,noParte:S.setup.noParte,operacion:S.setup.operacion,horas:S.setup.horas};
@@ -491,7 +492,7 @@ async function sendSetup(){
 async function sendManto(){
   if(!S.manto.maquina||!S.manto.tipo) return;
   S.sending=true; render();
-  const fecha=S.fechaManual||getFecha(), hora=getHora();
+  const fecha=getFecha(), hora=getHora();
   await enviar({fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion});
   S.history.unshift({tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina});
   S.submitted={tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion,horas:S.manto.horas};
