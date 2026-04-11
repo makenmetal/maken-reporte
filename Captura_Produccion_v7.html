@@ -74,7 +74,7 @@ let CAT = null;
 let S = {
   view:"loading",
   empleado:null, loginNum:"", loginError:false,
-  turno:getTurno(), tab:"produccion", sending:false,
+  turno:getTurno(), fechaManual:null, tab:"produccion", sending:false,
   history:[], submitted:null,
   prod:{ maquina:"", partidas:[mkPartida()] },
   setup:{ maquina:"", noParte:"", operacion:"", horas:"", q:"" },
@@ -291,7 +291,7 @@ function buildMaquinas(selected,ns){
     const cols=Math.min(a.maquinas.length,2);
     return `<p class="area-label">${a.area}</p>
     <div class="btn-grid" style="grid-template-columns:repeat(${cols},1fr)">
-      ${a.maquinas.map(m=>{ const id=`${a.area} — ${m}`; return `<button class="big-btn${selected===id?" active":""}" data-ns="${ns}" data-maq="${id}">${m}</button>`; }).join("")}
+      ${a.maquinas.map(m=>{ return `<button class="big-btn${selected===m?" active":""}" data-ns="${ns}" data-maq="${m}">${m}</button>`; }).join("")}
     </div>`;
   }).join("");
 }
@@ -377,7 +377,9 @@ function buildMain(){
   const header=`<div class="header">
     <div style="font-weight:600;font-size:18px">MAKEN METAL</div>
     <div style="text-align:right">
-      <div style="font-size:13px;margin-bottom:3px">${getFecha()}</div>
+      <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px;align-items:center">
+        <input type="text" id="fechaInput" value="${S.fechaManual||getFecha()}" placeholder="dd/mm/yyyy" style="width:100px;font-size:12px;padding:4px 6px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff">
+      </div>
       <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
         <span style="font-size:13px;color:#888;line-height:26px">Turno</span>
         <button class="turno-btn${S.turno==="1ro"?" active":""}" data-turno="1ro">1ro</button>
@@ -401,6 +403,7 @@ function bindMain(){
   const $=id=>document.getElementById(id);
   const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn));
   $("salirBtn")?.addEventListener("click",()=>{ S.empleado=null; S.view="login"; render(); });
+  $("fechaInput")?.addEventListener("change",e=>{ S.fechaManual=e.target.value; });
   on(".tab-btn","click",e=>{ S.tab=e.currentTarget.dataset.tab; render(); });
   on(".turno-btn","click",e=>{ S.turno=e.currentTarget.dataset.turno; render(); });
   on("[data-maq]","click",e=>{
@@ -459,7 +462,7 @@ function updateResults(ns,q){
 async function sendProd(){
   if(!S.prod.maquina||!S.prod.partidas[0].noParte) return;
   S.sending=true; render();
-  const fecha=getFecha(), hora=getHora();
+  const fecha=S.fechaManual||getFecha(), hora=getHora();
   for(const pt of S.prod.partidas){
     if(!pt.noParte) continue;
     await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:pt.piezas,horasSetup:"",horasManto:"",tipoManto:"",descripcion:""});
@@ -472,7 +475,7 @@ async function sendProd(){
 async function sendSetup(){
   if(!S.setup.maquina||!S.setup.noParte) return;
   S.sending=true; render();
-  const fecha=getFecha(), hora=getHora();
+  const fecha=S.fechaManual||getFecha(), hora=getHora();
   await enviar({fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:S.setup.noParte,tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""});
   S.history.unshift({tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina});
   S.submitted={tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina,noParte:S.setup.noParte,operacion:S.setup.operacion,horas:S.setup.horas};
@@ -482,7 +485,7 @@ async function sendSetup(){
 async function sendManto(){
   if(!S.manto.maquina||!S.manto.tipo) return;
   S.sending=true; render();
-  const fecha=getFecha(), hora=getHora();
+  const fecha=S.fechaManual||getFecha(), hora=getHora();
   await enviar({fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion});
   S.history.unshift({tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina});
   S.submitted={tipo:"Mantenimiento",fecha,hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion,horas:S.manto.horas};
