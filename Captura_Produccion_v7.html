@@ -82,7 +82,7 @@ let S = {
   resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
 };
 
-function mkPartida(){ return { noParte:"", operacion:"", piezas:"", q:"" }; }
+function mkPartida(){ return { noParte:"", operacion:"", piezas:"", horas:"", q:"" }; }
 
 function getTurno(){
   const t=new Date(), m=t.getHours()*60+t.getMinutes();
@@ -331,6 +331,9 @@ function buildProd(){
       <div class="field"><label>Piezas producidas</label>
         <input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="${i}" value="${pt.piezas}">
       </div>
+      ${pt.noParte==="Otro"?`<div class="field"><label>Horas</label>
+        <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="${i}" value="${pt.horas||""}" step="0.5">
+      </div>`:""}
     </div>`;
   }).join("")}
   <button class="add-btn" id="addPartida">+ Agregar otra partida</button>
@@ -359,7 +362,7 @@ function buildManto(){
   <div class="card">
     <div class="field"><label>Tipo de mantenimiento</label>
       <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
-        ${TIPOS_MANTO.map(t=>`<button class="big-btn${m.tipo===t?" active":""}" data-mantotipo="${t}">${t}</button>`).join("")}
+        ${(CAT.tiposmanto||TIPOS_MANTO).map(t=>`<button class="big-btn${m.tipo===t?" active":""}" data-mantotipo="${t}">${t}</button>`).join("")}
       </div>
     </div>
     <div class="field"><label>Descripción</label>
@@ -427,6 +430,7 @@ function bindMain(){
     render();
   });
   on("[data-piezas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
+  on("[data-horas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
   $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
   $("mantoDesc")?.addEventListener("input",e=>S.manto.descripcion=e.currentTarget.value);
   $("mantoHoras")?.addEventListener("input",e=>S.manto.horas=e.currentTarget.value);
@@ -465,7 +469,7 @@ async function sendProd(){
   const fecha=S.fechaManual||getFecha(), hora=getHora();
   for(const pt of S.prod.partidas){
     if(!pt.noParte) continue;
-    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:pt.piezas,horasSetup:"",horasManto:"",tipoManto:"",descripcion:""});
+    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:pt.noParte==="Otro"?"":pt.piezas,horasSetup:pt.noParte==="Otro"?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
   }
   S.history.unshift({tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina});
   S.submitted={tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina,partidas:[...S.prod.partidas]};
@@ -493,8 +497,8 @@ async function sendManto(){
   S.sending=false; S.view="done"; render();
 }
 
-Promise.all([fetchCat("empleados"),fetchCat("operaciones"),fetchCat("partes")])
-  .then(([empleados,operaciones,partes])=>{ CAT={empleados,operaciones,partes}; S.view="login"; render(); })
+Promise.all([fetchCat("empleados"),fetchCat("operaciones"),fetchCat("partes"),fetchCat("tiposmanto")])
+  .then(([empleados,operaciones,partes,tiposmanto])=>{ CAT={empleados,operaciones,partes,tiposmanto}; S.view="login"; render(); })
   .catch(()=>{ document.getElementById("app").innerHTML=`<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catálogos. Verifica conexión.</div>`; });
 </script>
 </body>
