@@ -77,7 +77,7 @@ let S = {
   turno:getTurno(), fechaManual:null, tab:"produccion", sending:false,
   history:[], submitted:null,
   prod:{ maquina:"", partidas:[mkPartida()] },
-  setup:{ maquina:"", noParte:"", operacion:"", horas:"", q:"" },
+  setup:{ maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" },
   manto:{ maquina:"", tipo:"", descripcion:"", horas:"" },
   resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
 };
@@ -375,6 +375,9 @@ function buildSetup(){
   return `<div class="section"><label>Máquina</label>${buildMaquinas("setup")}</div>
   <div class="card">
     ${buildBuscador("setup",s.q||"",s.noParte)}
+    <div class="field"><label>Orden de trabajo</label>
+      <input type="number" inputmode="numeric" placeholder="550214" id="setupOT" value="${s.ot||""}" style="font-size:22px;font-weight:600;padding:14px;" onkeydown="return event.keyCode===8||event.keyCode===9||event.keyCode===46||(event.keyCode>=48&&event.keyCode<=57)||(event.keyCode>=96&&event.keyCode<=105)">
+    </div>
     ${s.noParte&&ops.length?buildOpBtns(ops,s.operacion,s.maquina,"setup"):""}
     <div class="field"><label>Horas de setup</label>
       <input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="${s.horas}" step="0.5">
@@ -455,6 +458,7 @@ function bindMain(){
   on("[data-horas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
   on("[data-ot]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.ot)].ot=e.currentTarget.value; });
   $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
+  $("setupOT")?.addEventListener("input",e=>S.setup.ot=e.currentTarget.value);
   $("mantoDesc")?.addEventListener("input",e=>S.manto.descripcion=e.currentTarget.value);
   $("mantoHoras")?.addEventListener("input",e=>S.manto.horas=e.currentTarget.value);
 
@@ -495,12 +499,13 @@ async function sendProd(){
 }
 async function sendSetup(){
   if(!S.setup.maquina||!S.setup.noParte) return;
+  if(!S.setup.ot){ alert("La orden de trabajo es obligatoria."); return; }
   S.sending=true; render();
   const fecha=getFecha(), hora=getHora();
-  await enviar({fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:S.setup.noParte,tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""});
+  await enviar({fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:S.setup.noParte,ordenTrabajo:S.setup.ot||"",tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""});
   S.history.unshift({tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina});
   S.submitted={tipo:"Setup",fecha,hora,turno:S.turno,maquina:S.setup.maquina,noParte:S.setup.noParte,operacion:S.setup.operacion,horas:S.setup.horas};
-  S.setup={maquina:"",noParte:"",operacion:"",horas:"",q:""};
+  S.setup={maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""};
   S.sending=false; S.view="done"; render();
 }
 async function sendManto(){
