@@ -82,7 +82,7 @@ let S = {
   resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
 };
 
-function mkPartida(){ return { noParte:"", operacion:"", piezas:"", horas:"", q:"" }; }
+function mkPartida(){ return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", q:"" }; }
 
 function getTurno(){
   const t=new Date(), m=t.getHours()*60+t.getMinutes();
@@ -182,7 +182,9 @@ function render(){
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function buildLogin(){
   return `<div style="max-width:400px;margin:0 auto;padding:3rem 1.5rem">
-    <p style="font-weight:600;font-size:22px;margin-bottom:4px">MAKEN METAL</p>
+    <div style="background:#000;border-radius:10px;padding:8px 14px;display:inline-block;margin-bottom:16px">
+      <span style="color:#fff;font-weight:900;font-size:28px;letter-spacing:-1px">MK</span><span style="color:#1D9E75;font-weight:900;font-size:28px">M</span>
+    </div>
     <p style="font-size:15px;color:#888;margin-bottom:40px">Reporte de producción</p>
     <label>Número de empleado</label>
     <input id="loginNum" type="number" inputmode="numeric" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">
@@ -341,6 +343,9 @@ function buildProd(){
         ${i>0?`<button class="del-btn" onclick="delPartida(${i})">Eliminar</button>`:""}
       </div>
       ${buildBuscador(`prod_${i}`,pt.q||"",pt.noParte)}
+      <div class="field"><label>Orden de trabajo</label>
+        <input type="text" inputmode="text" placeholder="Ej. OT-1042" data-ot="${i}" value="${pt.ot||""}" style="font-size:22px;font-weight:600;padding:14px;">
+      </div>
       ${pt.noParte&&!esOtro&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_${i}`):""}
       ${esOtro?`<div class="field"><label>Operación</label>
         <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
@@ -403,10 +408,14 @@ function buildManto(){
 function buildMain(){
   const fecha=getFecha();
   const header=`<div class="header">
-    <div style="font-weight:600;font-size:18px">MAKEN METAL</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="background:#000;border-radius:8px;padding:4px 8px">
+        <span style="color:#fff;font-weight:900;font-size:22px;letter-spacing:-1px">MK</span><span style="color:#1D9E75;font-weight:900;font-size:22px">M</span>
+      </div>
+    </div>
     <div style="text-align:right">
-      <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px;align-items:center">
-        <input type="text" id="fechaInput" value="${fecha}" placeholder="dd/mm/yyyy" style="width:105px;font-size:12px;padding:4px 6px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff">
+      <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px;align-items:center">
+        <input type="text" id="fechaInput" value="${fecha}" placeholder="dd/mm/yyyy" style="width:115px;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff;font-weight:500">
       </div>
       <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
         <span style="font-size:13px;color:#888;line-height:26px">Turno</span>
@@ -443,6 +452,7 @@ function bindMain(){
 
   on("[data-piezas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
   on("[data-horas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
+  on("[data-ot]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.ot)].ot=e.currentTarget.value; });
   $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
   $("mantoDesc")?.addEventListener("input",e=>S.manto.descripcion=e.currentTarget.value);
   $("mantoHoras")?.addEventListener("input",e=>S.manto.horas=e.currentTarget.value);
@@ -472,7 +482,7 @@ async function sendProd(){
   for(const pt of S.prod.partidas){
     if(!pt.noParte) continue;
     const esOtro=pt.noParte==="Otro";
-    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
+    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,ordenTrabajo:pt.ot||"",tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
   }
   S.history.unshift({tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina});
   S.submitted={tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina,partidas:[...S.prod.partidas]};
