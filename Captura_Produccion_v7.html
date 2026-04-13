@@ -294,6 +294,7 @@ function buildDone(){
         <div class="info-row"><span class="info-label">Horas</span><span class="info-val">${sub.horas||"—"}</span></div>`:""}
     </div>
     <button class="send-btn" style="background:#1D9E75" onclick="doNuevo()">Nuevo reporte</button>
+    <button style="width:100%;padding:12px 0;border:1px solid #ddd;border-radius:14px;font-size:16px;font-weight:500;background:transparent;color:#888;cursor:pointer;margin-top:8px" onclick="doSalir()">Regresar al inicio</button>
     ${hist}
   </div>`;
 }
@@ -344,7 +345,7 @@ function buildProd(){
       </div>
       ${buildBuscador(`prod_${i}`,pt.q||"",pt.noParte)}
       <div class="field"><label>Orden de trabajo</label>
-        <input type="text" inputmode="text" placeholder="Ej. OT-1042" data-ot="${i}" value="${pt.ot||""}" style="font-size:22px;font-weight:600;padding:14px;">
+        <input type="number" inputmode="numeric" placeholder="Ej. 1042" data-ot="${i}" value="${pt.ot||""}" style="font-size:22px;font-weight:600;padding:14px;">
       </div>
       ${pt.noParte&&!esOtro&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_${i}`):""}
       ${esOtro?`<div class="field"><label>Operación</label>
