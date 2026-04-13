@@ -345,7 +345,7 @@ function buildProd(){
       </div>
       ${buildBuscador(`prod_${i}`,pt.q||"",pt.noParte)}
       <div class="field"><label>Orden de trabajo</label>
-        <input type="number" inputmode="numeric" placeholder="Ej. 1042" data-ot="${i}" value="${pt.ot||""}" style="font-size:22px;font-weight:600;padding:14px;">
+        <input type="number" inputmode="numeric" placeholder="550214" data-ot="${i}" value="${pt.ot||""}" style="font-size:22px;font-weight:600;padding:14px;" onkeydown="return event.keyCode===8||event.keyCode===9||event.keyCode===46||(event.keyCode>=48&&event.keyCode<=57)||(event.keyCode>=96&&event.keyCode<=105)">
       </div>
       ${pt.noParte&&!esOtro&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_${i}`):""}
       ${esOtro?`<div class="field"><label>Operación</label>
@@ -478,6 +478,9 @@ function updateResults(ns,q){
 
 async function sendProd(){
   if(!S.prod.maquina||!S.prod.partidas[0].noParte) return;
+  for(const pt of S.prod.partidas){
+    if(!pt.ot){ alert("La orden de trabajo es obligatoria en todas las partidas."); return; }
+  }
   S.sending=true; render();
   const fecha=getFecha(), hora=getHora();
   for(const pt of S.prod.partidas){
