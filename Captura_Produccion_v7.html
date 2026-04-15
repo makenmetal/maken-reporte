@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1D9E75">
-<title>MAKEN METAL — Reporte</title>
+<title>MAKEN METAL - Reporte</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
 .wrap { max-width: 480px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
 label { font-size: 14px; color: #666; margin-bottom: 6px; display: block; font-weight: 500; }
 input, textarea { width: 100%; padding: 12px 14px; font-size: 17px; border-radius: 12px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; font-family: inherit; }
@@ -82,17 +82,17 @@ var OPS_POR_AREA = {
 };
 var CAT = null;
 var S = {
-  view: "loading", empleado: null, loginError: false,
-  turno: getTurno(), fechaManual: null, tab: "produccion", sending: false,
-  history: [], submitted: null,
-  prod:   { maquina: "", partidas: [mkPartida()] },
-  setup:  { maquina: "", noParte: "", operacion: "", horas: "", ot: "", q: "" },
-  manto:  { maquina: "", tipo: "", descripcion: "", horas: "" },
-  resumen:{ fecha: getFechaHoy(), turno: getTurno(), loading: false, data: null }
+  view:"loading", empleado:null, loginError:false,
+  turno:getTurno(), fechaManual:null, tab:"produccion", sending:false,
+  history:[], submitted:null,
+  prod:  { maquina:"", partidas:[mkPartida()] },
+  setup: { maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" },
+  manto: { maquina:"", tipo:"", descripcion:"", horas:"" },
+  resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null }
 };
 
 function mkPartida() {
-  return { noParte: "", operacion: "", piezas: "", horas: "", ot: "", desc: "", q: "" };
+  return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", desc:"", q:"" };
 }
 function getTurno() {
   var h = new Date().getHours();
@@ -112,29 +112,29 @@ function getMaqArea(m) {
   if (!m) return "";
   var s = m.toLowerCase();
   if (s.indexOf("machueleadora") >= 0) return "roscado";
-  if (s.indexOf("doosan") >= 0) return "centro_maquinado";
+  if (s.indexOf("doosan") >= 0)        return "centro_maquinado";
   if (s.indexOf("puma") >= 0 || s.indexOf("haas") >= 0) return "torno";
-  if (s.indexOf("okamoto") >= 0) return "rect_interior";
+  if (s.indexOf("okamoto") >= 0)       return "rect_interior";
   if (s.indexOf("bsa") >= 0 || s.indexOf("kellen") >= 0) return "rect_exterior";
-  if (s.indexOf("revolver") >= 0) return "avellanado";
-  if (s.indexOf("amada") >= 0) return "corte";
-  if (s.indexOf("ensamble") >= 0) return "ensamble";
-  if (s.indexOf("soldadura") >= 0) return "soldadura";
-  if (s.indexOf("detallado") >= 0) return "detallado";
+  if (s.indexOf("revolver") >= 0)      return "avellanado";
+  if (s.indexOf("amada") >= 0)         return "corte";
+  if (s.indexOf("ensamble") >= 0)      return "ensamble";
+  if (s.indexOf("soldadura") >= 0)     return "soldadura";
+  if (s.indexOf("detallado") >= 0)     return "detallado";
   return "otro";
 }
 function getTipoOp(cod) {
   var n = parseInt(cod);
-  var op = isNaN(n)
-    ? CAT.operaciones.filter(function(o){ return String(o.codigo).toLowerCase() === String(cod).toLowerCase(); })[0]
-    : CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === n; })[0];
-  return op ? op.nombre : cod;
+  var lista = isNaN(n)
+    ? CAT.operaciones.filter(function(o){ return String(o.codigo).toLowerCase() === String(cod).toLowerCase(); })
+    : CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === n; });
+  return lista.length ? lista[0].nombre : cod;
 }
 function opLabel(op, maq) {
   var area = getMaqArea(maq);
   if (op === "50a" && area === "centro_maquinado") {
-    var r = CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === 500; })[0];
-    return (r ? r.nombre : "Roscado") + " (" + op + ")";
+    var r = CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === 500; });
+    return (r.length ? r[0].nombre : "Roscado") + " (" + op + ")";
   }
   return getTipoOp(op) + " (" + op + ")";
 }
@@ -153,54 +153,58 @@ function tiposManto() {
   return (CAT && CAT.tiposmanto && CAT.tiposmanto.length) ? CAT.tiposmanto : TIPOS_MANTO_DEFAULT;
 }
 function fetchCat(a) {
-  return fetch(SHEETS_URL + "?action=" + a, { method:"GET", mode:"cors", redirect:"follow" }).then(function(r){ return r.json(); });
+  return fetch(SHEETS_URL + "?action=" + a, {method:"GET",mode:"cors",redirect:"follow"}).then(function(r){ return r.json(); });
 }
 function enviar(data) {
-  return fetch(SHEETS_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data) });
+  return fetch(SHEETS_URL, {method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
 }
 function cargarResumen() {
   S.resumen.loading = true; render();
-  fetch(SHEETS_URL + "?action=reportes&fecha=" + encodeURIComponent(S.resumen.fecha) + "&turno=" + encodeURIComponent(S.resumen.turno), { method:"GET", mode:"cors", redirect:"follow" })
+  fetch(SHEETS_URL + "?action=reportes&fecha=" + encodeURIComponent(S.resumen.fecha) + "&turno=" + encodeURIComponent(S.resumen.turno), {method:"GET",mode:"cors",redirect:"follow"})
     .then(function(r){ return r.json(); })
-    .then(function(data){ S.resumen.data = data; S.resumen.loading = false; render(); })
+    .then(function(d){ S.resumen.data = d; S.resumen.loading = false; render(); })
     .catch(function(){ S.resumen.data = []; S.resumen.loading = false; render(); });
 }
 
-function setTab(t)       { S.tab = t; render(); }
-function setTurno(t)     { S.turno = t; render(); }
-function setRTurno(t)    { S.resumen.turno = t; render(); }
-function selManto(t)     { S.manto.tipo = t; render(); }
-function delPartida(i)   { S.prod.partidas.splice(i, 1); render(); }
-function addPartida()    { S.prod.partidas.push(mkPartida()); render(); }
-function doSalir()       { S.empleado = null; S.view = "login"; render(); }
-function doNuevo()       { S.submitted = null; S.view = "main"; render(); }
-function doSalirResumen(){ S.view = "login"; render(); }
-function doBuscarResumen(){
+function setTab(t)    { S.tab = t; render(); }
+function setTurno(t)  { S.turno = t; render(); }
+function setRTurno(t) { S.resumen.turno = t; render(); }
+function selManto(t)  { S.manto.tipo = t; render(); }
+function delPartida(i){ S.prod.partidas.splice(i,1); render(); }
+function addPartida() { S.prod.partidas.push(mkPartida()); render(); }
+function doSalir()    { S.empleado = null; S.view = "login"; render(); }
+function doNuevo()    { S.submitted = null; S.view = "main"; render(); }
+function doSalirResumen() { S.view = "login"; render(); }
+function doBuscarResumen() {
   var inp = document.getElementById("resumenFecha");
   if (inp) S.resumen.fecha = inp.value;
   cargarResumen();
 }
 function setMaq(ns, maq) {
-  if (ns === "prod") S.prod.maquina = maq;
-  else if (ns === "setup") S.setup.maquina = maq;
-  else if (ns === "manto") S.manto.maquina = maq;
+  if (ns === "prod")        S.prod.maquina  = maq;
+  else if (ns === "setup")  S.setup.maquina = maq;
+  else if (ns === "manto")  S.manto.maquina = maq;
   render();
 }
 function setOp(ns, op) {
-  if (ns.indexOf("prod_") === 0) { var i = parseInt(ns.replace("prod_","")); S.prod.partidas[i].operacion = op; }
-  else if (ns === "setup") S.setup.operacion = op;
+  if (ns.indexOf("prod_") === 0) {
+    var i = parseInt(ns.replace("prod_",""));
+    S.prod.partidas[i].operacion = op;
+  } else if (ns === "setup") {
+    S.setup.operacion = op;
+  }
   render();
 }
 function selParte(ns, parte) {
   if (ns.indexOf("prod_") === 0) {
     var i = parseInt(ns.replace("prod_",""));
-    S.prod.partidas[i].noParte = parte;
-    S.prod.partidas[i].q = parte;
+    S.prod.partidas[i].noParte   = parte;
+    S.prod.partidas[i].q         = parte;
     S.prod.partidas[i].operacion = "";
-    S.prod.partidas[i].desc = "";
+    S.prod.partidas[i].desc      = "";
   } else if (ns === "setup") {
-    S.setup.noParte = parte;
-    S.setup.q = parte;
+    S.setup.noParte   = parte;
+    S.setup.q         = parte;
     S.setup.operacion = "";
   }
   render();
@@ -208,30 +212,22 @@ function selParte(ns, parte) {
 function doLogin(val) {
   var str = String(val).trim();
   if (str === OWNER_PIN) { S.view = "resumen"; cargarResumen(); render(); return; }
-  var n = parseInt(str);
-  var emp = null;
+  var n = parseInt(str), emp = null;
   for (var i = 0; i < CAT.empleados.length; i++) {
     if (parseInt(CAT.empleados[i].numero) === n) { emp = CAT.empleados[i]; break; }
   }
   if (emp) { S.empleado = emp; S.loginError = false; S.view = "main"; render(); }
-  else { S.loginError = true; render(); }
-}
-function soloNumeros(e) {
-  var k = e.keyCode || e.which;
-  if (k === 8 || k === 9 || k === 46 || (k >= 48 && k <= 57) || (k >= 96 && k <= 105)) return true;
-  e.preventDefault();
+  else     { S.loginError = true; render(); }
 }
 
 function render() {
   var app = document.getElementById("app");
-  if (S.view === "loading")  { app.innerHTML = buildSpinner(); return; }
-  if (S.view === "login")    { app.innerHTML = buildLogin();   bindLogin();   return; }
-  if (S.view === "done")     { app.innerHTML = buildDone();    return; }
-  if (S.view === "resumen")  { app.innerHTML = buildResumen(); bindResumen(); return; }
+  if (S.view === "loading") { app.innerHTML = '<div class="spinner">Cargando catalogos...</div>'; return; }
+  if (S.view === "login")   { app.innerHTML = buildLogin();   bindLogin();   return; }
+  if (S.view === "done")    { app.innerHTML = buildDone();    bindDone();    return; }
+  if (S.view === "resumen") { app.innerHTML = buildResumen(); bindResumen(); return; }
   app.innerHTML = buildMain(); bindMain();
 }
-
-function buildSpinner() { return '<div class="spinner">Cargando catalogos...</div>'; }
 
 function buildLogin() {
   return '<div style="max-width:400px;margin:0 auto;padding:3rem 1.5rem">'
@@ -250,12 +246,12 @@ function bindLogin() {
   var btn = document.getElementById("loginBtn");
   inp.focus();
   inp.addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(inp.value); });
-  btn.addEventListener("click",   function()  { doLogin(inp.value); });
+  btn.addEventListener("click", function(){ doLogin(inp.value); });
 }
 
 function buildResumen() {
   var r = S.resumen, rows = r.data || [];
-  var prod  = rows.filter(function(x){ return x.tipo === "Produccion" || x.tipo === "Producción"; });
+  var prod  = rows.filter(function(x){ return x.tipo === "Produccion" || x.tipo === "Produccion"; });
   var setup = rows.filter(function(x){ return x.tipo === "Setup"; });
   var manto = rows.filter(function(x){ return x.tipo === "Mantenimiento"; });
   var byMaq = {}, setupByMaq = {}, mantoByMaq = {};
@@ -264,23 +260,22 @@ function buildResumen() {
     byMaq[row.maquina].push(row);
   });
   setup.forEach(function(row){
-    if (!setupByMaq[row.maquina]) setupByMaq[row.maquina] = { horas:0, responsables:[] };
+    if (!setupByMaq[row.maquina]) setupByMaq[row.maquina] = {horas:0, responsables:[]};
     setupByMaq[row.maquina].horas += parseFloat(row.horasSetup) || 0;
     var num = (row.responsable || "").split(" - ")[0];
     if (num && setupByMaq[row.maquina].responsables.indexOf(num) === -1) setupByMaq[row.maquina].responsables.push(num);
   });
   manto.forEach(function(row){
-    if (!mantoByMaq[row.maquina]) mantoByMaq[row.maquina] = { horas:0, tipos:[] };
+    if (!mantoByMaq[row.maquina]) mantoByMaq[row.maquina] = {horas:0, tipos:[]};
     mantoByMaq[row.maquina].horas += parseFloat(row.horasManto) || 0;
     if (row.tipoManto && mantoByMaq[row.maquina].tipos.indexOf(row.tipoManto) === -1) mantoByMaq[row.maquina].tipos.push(row.tipoManto);
   });
-  var keys1 = Object.keys(byMaq), keys2 = Object.keys(setupByMaq), keys3 = Object.keys(mantoByMaq);
   var allSet = {};
-  keys1.concat(keys2).concat(keys3).forEach(function(k){ allSet[k] = 1; });
+  Object.keys(byMaq).concat(Object.keys(setupByMaq)).concat(Object.keys(mantoByMaq)).forEach(function(k){ allSet[k] = 1; });
   var allMaq = Object.keys(allSet).sort();
-  var totalPiezas = prod.reduce(function(a,r){ return a + (parseInt(r.piezas) || 0); }, 0);
-  var totalSetup  = setup.reduce(function(a,r){ return a + (parseFloat(r.horasSetup) || 0); }, 0);
-  var totalManto  = manto.reduce(function(a,r){ return a + (parseFloat(r.horasManto) || 0); }, 0);
+  var totalPiezas = prod.reduce(function(a,r){ return a + (parseInt(r.piezas)||0); }, 0);
+  var totalSetup  = setup.reduce(function(a,r){ return a + (parseFloat(r.horasSetup)||0); }, 0);
+  var totalManto  = manto.reduce(function(a,r){ return a + (parseFloat(r.horasManto)||0); }, 0);
 
   var estadoHTML = '<div class="card" style="margin-bottom:16px">'
     + '<p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MAQUINAS</p>'
@@ -295,11 +290,10 @@ function buildResumen() {
                 tS ? '<span style="font-size:11px;font-weight:600;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:8px">Setup</span>' : "",
                 tM ? '<span style="font-size:11px;font-weight:600;color:#BA7517;background:#FAEEDA;padding:2px 8px;border-radius:8px">Manto</span>' : ""
               ].filter(function(x){ return x; }).join(" ");
-              var sinReporte = '<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>';
+              var sinRep = '<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>';
               return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
                 + '<span style="font-size:15px;font-weight:500">' + m + '</span>'
-                + '<div style="display:flex;gap:4px">' + (badges || sinReporte) + '</div>'
-                + '</div>';
+                + '<div style="display:flex;gap:4px">' + ((tP||tS||tM) ? badges : sinRep) + '</div></div>';
             }).join("");
       }).join("")
     + '</div>';
@@ -307,30 +301,36 @@ function buildResumen() {
   var detalleHTML = allMaq.length === 0
     ? '<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>'
     : allMaq.map(function(maq){
-        var filas = byMaq[maq] || [];
+        var filas  = byMaq[maq]     || [];
         var hSetup = setupByMaq[maq];
         var hManto = mantoByMaq[maq];
         return '<div class="card" style="margin-bottom:12px">'
           + '<p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">' + maq + '</p>'
-          + (filas.length ? '<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCION</p>'
-              + filas.map(function(f){
-                  var esOtro = f.noParte && f.noParte.indexOf("Otro") === 0;
-                  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
-                    + '<div><span style="font-size:15px;font-weight:500">' + (f.noParte||"") + '</span>'
-                    + '<span style="font-size:12px;color:#888;margin-left:6px">' + (f.tipoOperacion||f.operacion||"") + '</span></div>'
-                    + '<div style="text-align:right">'
-                    + '<span style="font-size:20px;font-weight:700">' + (f.piezas||"—") + '</span>'
-                    + (esOtro && f.horasSetup ? '<span style="font-size:12px;color:#1D9E75;display:block">' + f.horasSetup + ' hrs</span>' : "")
-                    + '<span style="font-size:11px;color:#888;display:block">' + ((f.responsable||"").split(" - ")[0]) + '</span>'
-                    + '</div></div>';
-                }).join("") : "")
-          + (hSetup ? '<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
-              + '<div><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span>'
-              + '<span style="font-size:11px;color:#888;margin-left:6px">' + hSetup.responsables.join(", ") + '</span></div>'
-              + '<span style="font-size:15px;font-weight:700;color:#185FA5">' + hSetup.horas.toFixed(1) + ' hrs</span></div>' : "")
-          + (hManto ? '<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
-              + '<span style="font-size:13px;color:#BA7517;font-weight:500">Manto - ' + hManto.tipos.join(", ") + '</span>'
-              + '<span style="font-size:15px;font-weight:700;color:#BA7517">' + hManto.horas.toFixed(1) + ' hrs</span></div>' : "")
+          + (filas.length
+              ? '<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCION</p>'
+                + filas.map(function(f){
+                    var esOtro = f.noParte && f.noParte.indexOf("Otro") === 0;
+                    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
+                      + '<div><span style="font-size:15px;font-weight:500">' + (f.noParte||"") + '</span>'
+                      + '<span style="font-size:12px;color:#888;margin-left:6px">' + (f.tipoOperacion||f.operacion||"") + '</span></div>'
+                      + '<div style="text-align:right">'
+                      + '<span style="font-size:20px;font-weight:700">' + (f.piezas||"0") + '</span>'
+                      + (esOtro && f.horasSetup ? '<span style="font-size:12px;color:#1D9E75;display:block">' + f.horasSetup + ' hrs</span>' : "")
+                      + '<span style="font-size:11px;color:#888;display:block">' + ((f.responsable||"").split(" - ")[0]) + '</span>'
+                      + '</div></div>';
+                  }).join("")
+              : "")
+          + (hSetup
+              ? '<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
+                + '<div><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span>'
+                + '<span style="font-size:11px;color:#888;margin-left:6px">' + hSetup.responsables.join(", ") + '</span></div>'
+                + '<span style="font-size:15px;font-weight:700;color:#185FA5">' + hSetup.horas.toFixed(1) + ' hrs</span></div>'
+              : "")
+          + (hManto
+              ? '<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
+                + '<span style="font-size:13px;color:#BA7517;font-weight:500">Manto - ' + hManto.tipos.join(", ") + '</span>'
+                + '<span style="font-size:15px;font-weight:700;color:#BA7517">' + hManto.horas.toFixed(1) + ' hrs</span></div>'
+              : "")
           + '</div>';
       }).join("");
 
@@ -340,16 +340,17 @@ function buildResumen() {
     + '<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div>'
     + '<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
     + '<input type="text" id="resumenFecha" value="' + r.fecha + '" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
-    + '<button class="turno-btn' + (r.turno === "1ro" ? " active" : "") + '" id="rt1">1ro</button>'
-    + '<button class="turno-btn' + (r.turno === "3ro" ? " active" : "") + '" id="rt3">3ro</button>'
+    + '<button class="turno-btn' + (r.turno==="1ro"?" active":"") + '" id="rt1">1ro</button>'
+    + '<button class="turno-btn' + (r.turno==="3ro"?" active":"") + '" id="rt3">3ro</button>'
     + '<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="btnBuscar">Buscar</button>'
     + '</div></div>'
-    + (r.loading ? '<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
-      : '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
-        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:28px;font-weight:700;color:#1D9E75">' + totalPiezas + '</p></div>'
-        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">' + totalSetup.toFixed(1) + '</p></div>'
-        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">' + totalManto.toFixed(1) + '</p></div>'
-        + '</div>' + estadoHTML + detalleHTML)
+    + (r.loading
+        ? '<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
+        : '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
+          + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:28px;font-weight:700;color:#1D9E75">' + totalPiezas + '</p></div>'
+          + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">' + totalSetup.toFixed(1) + '</p></div>'
+          + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">' + totalManto.toFixed(1) + '</p></div>'
+          + '</div>' + estadoHTML + detalleHTML)
     + '</div>';
 }
 function bindResumen() {
@@ -367,7 +368,7 @@ function buildDone() {
   if (S.history.length) {
     histHTML = '<div style="margin-top:28px"><p style="font-size:14px;color:#888;margin-bottom:10px">Reportes del dia</p>';
     S.history.forEach(function(h){
-      var c = h.tipo === "Produccion" || h.tipo === "Producción" ? "#1D9E75" : h.tipo === "Setup" ? "#185FA5" : "#BA7517";
+      var c = (h.tipo==="Produccion") ? "#1D9E75" : (h.tipo==="Setup") ? "#185FA5" : "#BA7517";
       histHTML += '<div class="history-item"><div>'
         + '<span style="font-size:15px;font-weight:500">' + h.maquina + '</span>'
         + '<span style="font-size:13px;color:#888;margin-left:8px">' + h.hora + '</span></div>'
@@ -376,7 +377,7 @@ function buildDone() {
     histHTML += '</div>';
   }
   var partidasHTML = "";
-  if (sub.tipo === "Produccion" || sub.tipo === "Producción") {
+  if (sub.tipo === "Produccion") {
     sub.partidas.forEach(function(p){
       partidasHTML += '<div style="border-top:1px solid #eee;padding-top:10px;margin-top:10px">'
         + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + p.noParte + '</span></div>'
@@ -396,25 +397,33 @@ function buildDone() {
     + '<div class="info-row"><span class="info-label">Maquina</span><span class="info-val">' + sub.maquina + '</span></div>'
     + '<div class="info-row"><span class="info-label">Empleado</span><span class="info-val">' + S.empleado.nombre + '</span></div>'
     + partidasHTML
-    + (sub.tipo === "Setup" ? '<div class="info-row"><span class="info-label">OT</span><span class="info-val">' + (sub.ot||"—") + '</span></div>'
-        + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + sub.noParte + '</span></div>'
-        + '<div class="info-row"><span class="info-label">Horas setup</span><span class="info-val">' + (sub.horas||"—") + '</span></div>' : "")
-    + (sub.tipo === "Mantenimiento" ? '<div class="info-row"><span class="info-label">Tipo</span><span class="info-val">' + sub.tipoManto + '</span></div>'
-        + '<div class="info-row"><span class="info-label">Horas</span><span class="info-val">' + (sub.horas||"—") + '</span></div>' : "")
+    + (sub.tipo==="Setup"
+        ? '<div class="info-row"><span class="info-label">OT</span><span class="info-val">' + (sub.ot||"—") + '</span></div>'
+          + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + sub.noParte + '</span></div>'
+          + '<div class="info-row"><span class="info-label">Horas setup</span><span class="info-val">' + (sub.horas||"—") + '</span></div>'
+        : "")
+    + (sub.tipo==="Mantenimiento"
+        ? '<div class="info-row"><span class="info-label">Tipo</span><span class="info-val">' + sub.tipoManto + '</span></div>'
+          + '<div class="info-row"><span class="info-label">Horas</span><span class="info-val">' + (sub.horas||"—") + '</span></div>'
+        : "")
     + '</div>'
     + '<button class="send-btn" style="background:#1D9E75" id="btnNuevo">Nuevo reporte</button>'
     + '<button style="width:100%;padding:12px 0;border:1px solid #ddd;border-radius:14px;font-size:16px;font-weight:500;background:transparent;color:#888;cursor:pointer;margin-top:8px" id="btnIni">Regresar al inicio</button>'
     + histHTML + '</div>';
 }
+function bindDone() {
+  document.getElementById("btnNuevo").addEventListener("click", doNuevo);
+  document.getElementById("btnIni").addEventListener("click", doSalir);
+}
 
 function buildMaquinas(ns) {
-  var sel = ns === "prod" ? S.prod.maquina : ns === "setup" ? S.setup.maquina : S.manto.maquina;
+  var sel = ns==="prod" ? S.prod.maquina : ns==="setup" ? S.setup.maquina : S.manto.maquina;
   var html = "";
   AREAS.forEach(function(a){
     var cols = Math.min(a.maquinas.length, 2);
     html += '<p class="area-label">' + a.area + '</p><div class="btn-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
     a.maquinas.forEach(function(m){
-      html += '<button class="big-btn' + (sel === m ? " active" : "") + '" data-ns="' + ns + '" data-maq="' + m + '">' + m + '</button>';
+      html += '<button class="big-btn' + (sel===m ? " active" : "") + '" data-ns="' + ns + '" data-maq="' + m + '">' + m + '</button>';
     });
     html += '</div>';
   });
@@ -443,7 +452,7 @@ function buildOpBtns(ops, selected, maq, ns) {
   if (!ops.length) return "";
   var html = '<div class="field"><label>Operacion</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">';
   ops.forEach(function(o){
-    html += '<button class="big-btn' + (selected === o ? " active" : "") + '" style="font-size:14px" data-ns="' + ns + '" data-op="' + o + '">' + opLabel(o, maq) + '</button>';
+    html += '<button class="big-btn' + (selected===o ? " active" : "") + '" style="font-size:14px" data-ns="' + ns + '" data-op="' + o + '">' + opLabel(o, maq) + '</button>';
   });
   return html + '</div></div>';
 }
@@ -452,59 +461,64 @@ function buildProd() {
   var p = S.prod;
   var html = '<div class="section"><label>Maquina</label>' + buildMaquinas("prod") + '</div>';
   p.partidas.forEach(function(pt, i){
-    var esOtro = pt.noParte === "Otro";
-    var ops = esOtro ? [] : getOps(pt.noParte, p.maquina);
-    var opsOtro = esOtro ? getOpsParaMaquina(p.maquina) : [];
-    var tc = (!esOtro && pt.noParte && pt.operacion && CAT.partes[pt.noParte]) ? CAT.partes[pt.noParte][pt.operacion] : null;
-    var area = getMaqArea(p.maquina);
+    var esOtro   = pt.noParte === "Otro";
+    var ops      = esOtro ? [] : getOps(pt.noParte, p.maquina);
+    var opsOtro  = esOtro ? getOpsParaMaquina(p.maquina) : [];
+    var tc       = (!esOtro && pt.noParte && pt.operacion && CAT.partes[pt.noParte]) ? CAT.partes[pt.noParte][pt.operacion] : null;
+    var area     = getMaqArea(p.maquina);
     html += '<div class="card">'
       + '<div class="partida-header"><span style="font-size:16px;font-weight:600">Partida ' + (i+1) + '</span>'
       + (i > 0 ? '<button class="del-btn" data-del="' + i + '">Eliminar</button>' : "") + '</div>'
-      + buildBuscador("prod_" + i, pt.q || "", pt.noParte)
-      + (esOtro ? '<div class="field"><label>Que se realizo?</label>'
-          + '<textarea placeholder="Describe brevemente lo que se realizo..." data-desc="' + i + '" style="font-size:16px;min-height:80px">' + (pt.desc||"") + '</textarea></div>' : "")
+      + buildBuscador("prod_" + i, pt.q||"", pt.noParte)
+      + (esOtro
+          ? '<div class="field"><label>Que se realizo?</label>'
+            + '<textarea placeholder="Describe brevemente lo que se realizo..." data-desc="' + i + '" style="font-size:16px;min-height:80px">' + (pt.desc||"") + '</textarea></div>'
+          : "")
       + '<div class="field"><label>Orden de trabajo</label>'
       + '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="ot-input" placeholder="550214" data-ot="' + i + '" value="' + (pt.ot||"") + '"></div>'
-      + (!esOtro && pt.noParte && ops.length ? buildOpBtns(ops, pt.operacion, p.maquina, "prod_" + i) : "")
-      + (esOtro && opsOtro.length ? '<div class="field"><label>Operacion</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
-          + opsOtro.map(function(o){
-              return '<button class="big-btn' + (pt.operacion === o ? " active" : "") + '" style="font-size:14px" data-ns="prod_' + i + '" data-op="' + o + '">' + opLabel(o, p.maquina) + '</button>';
-            }).join("") + '</div></div>' : "")
-      + (area === "torno" && pt.operacion === "100a" ? '<div class="torno-note">Rectificado Interior en Torno - reportado como 100s</div>' : "")
+      + (!esOtro && pt.noParte && ops.length ? buildOpBtns(ops, pt.operacion, p.maquina, "prod_"+i) : "")
+      + (esOtro && opsOtro.length
+          ? '<div class="field"><label>Operacion</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
+            + opsOtro.map(function(o){
+                return '<button class="big-btn' + (pt.operacion===o ? " active" : "") + '" style="font-size:14px" data-ns="prod_' + i + '" data-op="' + o + '">' + opLabel(o, p.maquina) + '</button>';
+              }).join("") + '</div></div>'
+          : "")
+      + (area==="torno" && pt.operacion==="100a" ? '<div class="torno-note">Rectificado Interior en Torno - reportado como 100s</div>' : "")
       + (tc ? '<div class="tc-note">Tiempo de ciclo: <strong>' + tc + ' min</strong></div>' : "")
       + '<div class="field"><label>Piezas</label>'
       + '<input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="' + i + '" value="' + pt.piezas + '"></div>'
-      + (esOtro ? '<div class="field"><label>Horas</label>'
-          + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="' + i + '" value="' + (pt.horas||"") + '" step="0.5"></div>' : "")
+      + (esOtro
+          ? '<div class="field"><label>Horas</label>'
+            + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="' + i + '" value="' + (pt.horas||"") + '" step="0.5"></div>'
+          : "")
       + '</div>';
   });
   html += '<button class="add-btn" id="btnAddPartida">+ Agregar otra partida</button>'
-    + '<button class="send-btn" style="background:#1D9E75" id="sendProd"' + (S.sending ? " disabled" : "") + '>'
+    + '<button class="send-btn" style="background:#1D9E75" id="sendProd"' + (S.sending?" disabled":"") + '>'
     + (S.sending ? "Enviando..." : "Enviar reporte") + '</button>';
   return html;
 }
 
 function buildSetup() {
   var s = S.setup;
-  var ops = (s.noParte && s.noParte !== "Otro" && CAT.partes[s.noParte]) ? Object.keys(CAT.partes[s.noParte]) : [];
+  var ops = (s.noParte && s.noParte!=="Otro" && CAT.partes[s.noParte]) ? Object.keys(CAT.partes[s.noParte]) : [];
   return '<div class="section"><label>Maquina</label>' + buildMaquinas("setup") + '</div>'
     + '<div class="card">'
-    + buildBuscador("setup", s.q || "", s.noParte)
+    + buildBuscador("setup", s.q||"", s.noParte)
     + '<div class="field"><label>Orden de trabajo</label>'
     + '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="ot-input" placeholder="550214" id="setupOT" value="' + (s.ot||"") + '"></div>'
     + (s.noParte && ops.length ? buildOpBtns(ops, s.operacion, s.maquina, "setup") : "")
     + '<div class="field"><label>Horas de setup</label>'
     + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="' + s.horas + '" step="0.5"></div>'
     + '</div>'
-    + '<button class="send-btn" style="background:#185FA5" id="sendSetup"' + (S.sending ? " disabled" : "") + '>'
+    + '<button class="send-btn" style="background:#185FA5" id="sendSetup"' + (S.sending?" disabled":"") + '>'
     + (S.sending ? "Enviando..." : "Enviar reporte de setup") + '</button>';
 }
 
 function buildManto() {
   var m = S.manto;
-  var tm = tiposManto();
-  var btns = tm.map(function(t){
-    return '<button class="big-btn' + (m.tipo === t ? " active" : "") + '" data-manto="' + t + '">' + t + '</button>';
+  var btns = tiposManto().map(function(t){
+    return '<button class="big-btn' + (m.tipo===t ? " active" : "") + '" data-manto="' + t + '">' + t + '</button>';
   }).join("");
   return '<div class="section"><label>Maquina</label>' + buildMaquinas("manto") + '</div>'
     + '<div class="card">'
@@ -515,7 +529,7 @@ function buildManto() {
     + '<div class="field"><label>Horas de mantenimiento</label>'
     + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="mantoHoras" value="' + m.horas + '" step="0.5"></div>'
     + '</div>'
-    + '<button class="send-btn" style="background:#BA7517" id="sendManto"' + (S.sending ? " disabled" : "") + '>'
+    + '<button class="send-btn" style="background:#BA7517" id="sendManto"' + (S.sending?" disabled":"") + '>'
     + (S.sending ? "Enviando..." : "Enviar reporte de mantenimiento") + '</button>';
 }
 
@@ -530,25 +544,23 @@ function buildMain() {
     + '<input type="text" id="fechaInput" value="' + fecha + '" placeholder="dd/mm/yyyy" style="width:115px;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff;font-weight:500"></div>'
     + '<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">'
     + '<span style="font-size:13px;color:#888;line-height:26px">Turno</span>'
-    + '<button class="turno-btn' + (S.turno === "1ro" ? " active" : "") + '" id="t1">1ro</button>'
-    + '<button class="turno-btn' + (S.turno === "3ro" ? " active" : "") + '" id="t3">3ro</button></div>'
+    + '<button class="turno-btn' + (S.turno==="1ro"?" active":"") + '" id="t1">1ro</button>'
+    + '<button class="turno-btn' + (S.turno==="3ro"?" active":"") + '" id="t3">3ro</button></div>'
     + '<div style="font-size:12px"><span style="color:#888">' + S.empleado.numero + ' - </span>'
     + '<span style="font-weight:500">' + S.empleado.nombre.split(",")[0] + '</span>'
     + '<button class="salir-btn" id="btnSalir">Salir</button></div>'
     + '</div></div>';
   var tabs = '<div class="tab-bar">'
-    + '<button class="tab-btn' + (S.tab === "produccion" ? " active" : "") + '" id="tabP">Produccion</button>'
-    + '<button class="tab-btn' + (S.tab === "setup" ? " active" : "") + '" id="tabS">Setup</button>'
-    + '<button class="tab-btn' + (S.tab === "manto" ? " active" : "") + '" id="tabM">Mantenimiento</button>'
+    + '<button class="tab-btn' + (S.tab==="produccion"?" active":"") + '" id="tabP">Produccion</button>'
+    + '<button class="tab-btn' + (S.tab==="setup"?" active":"") + '" id="tabS">Setup</button>'
+    + '<button class="tab-btn' + (S.tab==="manto"?" active":"") + '" id="tabM">Mantenimiento</button>'
     + '</div>';
-  var body = S.tab === "produccion" ? buildProd() : S.tab === "setup" ? buildSetup() : buildManto();
-  return header + tabs + body;
+  return header + tabs + (S.tab==="produccion" ? buildProd() : S.tab==="setup" ? buildSetup() : buildManto());
 }
 
 function bindMain() {
   var fi = document.getElementById("fechaInput");
   if (fi) fi.addEventListener("change", function(e){ S.fechaManual = e.target.value; });
-
   var t1 = document.getElementById("t1"); if (t1) t1.addEventListener("click", function(){ setTurno("1ro"); });
   var t3 = document.getElementById("t3"); if (t3) t3.addEventListener("click", function(){ setTurno("3ro"); });
   var bs = document.getElementById("btnSalir"); if (bs) bs.addEventListener("click", doSalir);
@@ -559,10 +571,10 @@ function bindMain() {
   var sp = document.getElementById("sendProd");  if (sp) sp.addEventListener("click", sendProd);
   var ss = document.getElementById("sendSetup"); if (ss) ss.addEventListener("click", sendSetup);
   var sm = document.getElementById("sendManto"); if (sm) sm.addEventListener("click", sendManto);
-
-  var bn = document.getElementById("btnNuevo"); if (bn) bn.addEventListener("click", doNuevo);
-  var bi = document.getElementById("btnIni");   if (bi) bi.addEventListener("click", doSalir);
-
+  var sh = document.getElementById("setupHoras"); if (sh) sh.addEventListener("input", function(){ S.setup.horas = sh.value; });
+  var so = document.getElementById("setupOT");    if (so) so.addEventListener("input", function(){ S.setup.ot   = so.value; });
+  var md = document.getElementById("mantoDesc");  if (md) md.addEventListener("input", function(){ S.manto.descripcion = md.value; });
+  var mh = document.getElementById("mantoHoras"); if (mh) mh.addEventListener("input", function(){ S.manto.horas = mh.value; });
   document.querySelectorAll("[data-maq]").forEach(function(el){
     el.addEventListener("click", function(){ setMaq(el.dataset.ns, el.dataset.maq); });
   });
@@ -584,7 +596,9 @@ function bindMain() {
       if (ns.indexOf("prod_") === 0) {
         var i = parseInt(ns.replace("prod_",""));
         S.prod.partidas[i].q = q; S.prod.partidas[i].noParte = ""; S.prod.partidas[i].operacion = ""; S.prod.partidas[i].desc = "";
-      } else if (ns === "setup") { S.setup.q = q; S.setup.noParte = ""; S.setup.operacion = ""; }
+      } else if (ns === "setup") {
+        S.setup.q = q; S.setup.noParte = ""; S.setup.operacion = "";
+      }
       updateResults(ns, q);
     });
   });
@@ -600,10 +614,6 @@ function bindMain() {
   document.querySelectorAll("[data-desc]").forEach(function(el){
     el.addEventListener("input", function(){ S.prod.partidas[parseInt(el.dataset.desc)].desc = el.value; });
   });
-  var sh = document.getElementById("setupHoras"); if (sh) sh.addEventListener("input", function(){ S.setup.horas = sh.value; });
-  var so = document.getElementById("setupOT");    if (so) so.addEventListener("input", function(){ S.setup.ot   = so.value; });
-  var md = document.getElementById("mantoDesc");  if (md) md.addEventListener("input", function(){ S.manto.descripcion = md.value; });
-  var mh = document.getElementById("mantoHoras"); if (mh) mh.addEventListener("input", function(){ S.manto.horas = mh.value; });
 }
 
 function updateResults(ns, q) {
@@ -636,16 +646,18 @@ function sendProd() {
   var fecha = getFecha(), hora = getHora();
   var promises = S.prod.partidas.filter(function(pt){ return pt.noParte; }).map(function(pt){
     var esOtro = pt.noParte === "Otro";
-    return enviar({ fecha:fecha, turno:S.turno, tipo:"Produccion", maquina:S.prod.maquina,
-      responsable: S.empleado.numero + " - " + S.empleado.nombre,
+    return enviar({
+      fecha:fecha, turno:S.turno, tipo:"Produccion",
+      maquina:S.prod.maquina, responsable:S.empleado.numero + " - " + S.empleado.nombre,
       noParte: esOtro ? "Otro - " + (pt.desc||"") : pt.noParte,
-      ordenTrabajo: pt.ot || "", tipoOperacion: pt.operacion ? getTipoOp(pt.operacion) : "",
-      operacion: pt.operacion, piezas: esOtro ? "" : pt.piezas,
-      horasSetup: esOtro ? pt.horas : "", horasManto:"", tipoManto:"", descripcion:"" });
+      ordenTrabajo:pt.ot||"", tipoOperacion:pt.operacion ? getTipoOp(pt.operacion) : "",
+      operacion:pt.operacion, piezas:esOtro ? "" : pt.piezas,
+      horasSetup:esOtro ? pt.horas : "", horasManto:"", tipoManto:"", descripcion:""
+    });
   });
   Promise.all(promises).then(function(){
     S.history.unshift({ tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina });
-    S.submitted = { tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina, partidas: S.prod.partidas.slice() };
+    S.submitted = { tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina, partidas:S.prod.partidas.slice() };
     S.prod = { maquina:"", partidas:[mkPartida()] };
     S.sending = false; S.view = "done"; render();
   });
@@ -656,13 +668,14 @@ function sendSetup() {
   if (!S.setup.ot) { alert("La orden de trabajo es obligatoria."); return; }
   S.sending = true; render();
   var fecha = getFecha(), hora = getHora();
-  enviar({ fecha:fecha, turno:S.turno, tipo:"Setup", maquina:S.setup.maquina,
-    responsable: S.empleado.numero + " - " + S.empleado.nombre,
-    noParte: S.setup.noParte, ordenTrabajo: S.setup.ot || "",
-    tipoOperacion: S.setup.operacion ? getTipoOp(S.setup.operacion) : "",
-    operacion: S.setup.operacion, piezas:"", horasSetup: S.setup.horas,
-    horasManto:"", tipoManto:"", descripcion:"" })
-  .then(function(){
+  enviar({
+    fecha:fecha, turno:S.turno, tipo:"Setup",
+    maquina:S.setup.maquina, responsable:S.empleado.numero + " - " + S.empleado.nombre,
+    noParte:S.setup.noParte, ordenTrabajo:S.setup.ot||"",
+    tipoOperacion:S.setup.operacion ? getTipoOp(S.setup.operacion) : "",
+    operacion:S.setup.operacion, piezas:"", horasSetup:S.setup.horas,
+    horasManto:"", tipoManto:"", descripcion:""
+  }).then(function(){
     S.history.unshift({ tipo:"Setup", fecha:fecha, hora:hora, turno:S.turno, maquina:S.setup.maquina });
     S.submitted = { tipo:"Setup", fecha:fecha, hora:hora, turno:S.turno, maquina:S.setup.maquina,
       noParte:S.setup.noParte, operacion:S.setup.operacion, horas:S.setup.horas, ot:S.setup.ot };
@@ -675,11 +688,12 @@ function sendManto() {
   if (!S.manto.maquina || !S.manto.tipo) return;
   S.sending = true; render();
   var fecha = getFecha(), hora = getHora();
-  enviar({ fecha:fecha, turno:S.turno, tipo:"Mantenimiento", maquina:S.manto.maquina,
-    responsable: S.empleado.numero + " - " + S.empleado.nombre,
+  enviar({
+    fecha:fecha, turno:S.turno, tipo:"Mantenimiento",
+    maquina:S.manto.maquina, responsable:S.empleado.numero + " - " + S.empleado.nombre,
     noParte:"", ordenTrabajo:"", tipoOperacion:"", operacion:"", piezas:"",
-    horasSetup:"", horasManto:S.manto.horas, tipoManto:S.manto.tipo, descripcion:S.manto.descripcion })
-  .then(function(){
+    horasSetup:"", horasManto:S.manto.horas, tipoManto:S.manto.tipo, descripcion:S.manto.descripcion
+  }).then(function(){
     S.history.unshift({ tipo:"Mantenimiento", fecha:fecha, hora:hora, turno:S.turno, maquina:S.manto.maquina });
     S.submitted = { tipo:"Mantenimiento", fecha:fecha, hora:hora, turno:S.turno, maquina:S.manto.maquina,
       tipoManto:S.manto.tipo, descripcion:S.manto.descripcion, horas:S.manto.horas };
