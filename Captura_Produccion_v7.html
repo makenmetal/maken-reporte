@@ -187,7 +187,7 @@ function buildLogin(){
     </div>
     <p style="font-size:15px;color:#888;margin-bottom:40px">Reporte de producción</p>
     <label>Número de empleado</label>
-    <input id="loginNum" type="number" inputmode="numeric" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">
+    <input id="loginNum" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">
     ${S.loginError?`<p class="error-msg">Número no encontrado.</p>`:""}
     <button class="send-btn" style="background:#1D9E75" onclick="doLogin(document.getElementById('loginNum').value)">Entrar</button>
   </div>`;
@@ -223,6 +223,7 @@ function buildResumen(){
   });
   const mantoByMaq={};
   manto.forEach(row=>{ if(!mantoByMaq[row.maquina]) mantoByMaq[row.maquina]={horas:0,tipos:[]}; mantoByMaq[row.maquina].horas+=parseFloat(row.horasManto)||0; if(row.tipoManto&&!mantoByMaq[row.maquina].tipos.includes(row.tipoManto)) mantoByMaq[row.maquina].tipos.push(row.tipoManto); });
+  const allMaq=[...new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)])].sort();
   const allMaquinas = AREAS.flatMap(a => a.maquinas);
   const maquinasConActividad = new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)]);
 
@@ -345,7 +346,8 @@ function buildMaquinas(ns){
 }
 
 function buildBuscador(ns,q,noParte){
-  const lista=q.length>1?Object.keys(CAT.partes).sort().filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
+  const PART_LIST = ["Otro", ...Object.keys(CAT.partes).sort()];
+  const lista=q.length>1?PART_LIST.filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
   const selected=noParte?`<div class="selected-parte">✓ ${noParte}</div>`:"";
   const results=lista.length&&!noParte?`<div class="search-results">${lista.map(p=>`<button class="search-result-btn" onclick="selParte('${ns}','${p}')">${p}</button>`).join("")}</div>`:"";
   return `<div class="field"><label>No. de parte</label>
@@ -502,7 +504,8 @@ function bindMain(){
 }
 
 function updateResults(ns,q){
-  const lista=q.length>1?Object.keys(CAT.partes).sort().filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
+  const PART_LIST = ["Otro", ...Object.keys(CAT.partes).sort()];
+  const lista=q.length>1?PART_LIST.filter(p=>p.toLowerCase().includes(q.toLowerCase())).slice(0,15):[];
   const inputs=document.querySelectorAll(`[data-search="${ns}"]`);
   if(!inputs.length) return;
   const wrap=inputs[0].closest(".field");
