@@ -115,7 +115,21 @@ function opLabel(op,maq){
   if(op==="50a"&&area==="centro_maquinado"){ const r=CAT.operaciones.find(o=>parseInt(o.codigo)===500); return `${r?r.nombre:"Roscado"} (${op})`; }
   return `${getTipoOp(op)} (${op})`;
 }
-function getOps(noParte,maq){
+function getOpsParaMaquina(maq){
+  const area = getMaqArea(maq);
+  const familias = {
+    "corte":    ["10a","10b","10c","10d"],
+    "torno":    ["20a","20b","20c","20d"],
+    "barrenado":["40a","40b","40c","40d"],
+    "centro_maquinado":["50a","50b","50c","50d"],
+    "marcado":  ["60a","60b","60c","60d"],
+    "rect_exterior":["90a","90b","90c","90d"],
+    "rect_interior":["100a","100b","100c","100d"],
+    "avellanado":["400a","400b","400c","400d"],
+    "roscado":  ["500a","500b","500c","500d"],
+  };
+  return familias[area] || Object.keys(familias).flatMap(k=>familias[k]);
+}
   if(!noParte||noParte==="Otro"||!CAT.partes[noParte]) return [];
   const area=getMaqArea(maq);
   return Object.keys(CAT.partes[noParte]).filter(op=>!(op==="500a"&&area==="centro_maquinado"));
@@ -379,7 +393,7 @@ function buildProd(){
       ${!esOtro&&pt.noParte&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,`prod_${i}`):""}
       ${esOtro?`<div class="field"><label>Operación</label>
         <div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">
-          ${CAT.operaciones.map(o=>`<button class="big-btn${pt.operacion===o.codigo?" active":""}" style="font-size:14px" onclick="setOp('prod_${i}','${o.codigo}')">${o.nombre}</button>`).join("")}
+          ${getOpsParaMaquina(p.maquina).map(o=>`<button class="big-btn${pt.operacion===o?" active":""}" style="font-size:14px" onclick="setOp('prod_${i}','${o}')">${opLabel(o,p.maquina)}</button>`).join("")}
         </div>
       </div>`:""}
       ${area==="torno"&&pt.operacion==="100a"?`<div class="torno-note">Rectificado Interior en Torno — reportado como 100s</div>`:""}
