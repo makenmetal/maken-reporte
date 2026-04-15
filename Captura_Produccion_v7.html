@@ -378,10 +378,8 @@ function buildProd(){
   const p=S.prod;
   return `<div class="section"><label>Máquina</label>${buildMaquinas("prod")}</div>
   ${p.partidas.map((pt,i)=>{
-    const ops=getOps(pt.noParte,p.maquina);
-    const tc=pt.noParte&&pt.noParte!=="Otro"&&pt.operacion&&CAT.partes[pt.noParte]?.[pt.operacion];
-    const area=getMaqArea(p.maquina);
-    const esOtro=pt.noParte==="Otro";
+    const esOtro = pt.noParte === "Otro";
+    const ops = esOtro ? [] : getOps(pt.noParte, p.maquina);
     return `<div class="card">
       <div class="partida-header">
         <span style="font-size:16px;font-weight:600">Partida ${i+1}</span>
