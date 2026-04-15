@@ -39,22 +39,23 @@ input:focus, textarea:focus { outline: 2px solid #1D9E75; border-color: #1D9E75;
 .del-btn { font-size: 14px; color: #E24B4A; background: none; border: none; cursor: pointer; padding: 8px; }
 .add-btn { width: 100%; padding: 14px 0; background: transparent; border: 1px dashed #bbb; border-radius: 12px; font-size: 15px; color: #888; cursor: pointer; margin-bottom: 8px; }
 .num-input { font-size: 32px !important; font-weight: 600; text-align: center; padding: 16px !important; }
+.ot-input { font-size: 22px !important; font-weight: 600; padding: 14px !important; }
 .field { margin-bottom: 16px; }
 .check-icon { width: 64px; height: 64px; border-radius: 50%; background: #E1F5EE; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }
 .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
 .pill { font-size: 13px; padding: 3px 12px; border-radius: 12px; font-weight: 500; }
-.salir { margin-left: 8px; font-size: 11px; color: #E24B4A; background: none; border: none; cursor: pointer; }
+.salir-btn { margin-left: 8px; font-size: 11px; color: #E24B4A; background: none; border: none; cursor: pointer; }
 .spinner { text-align: center; padding: 3rem; color: #888; font-size: 16px; }
 textarea { resize: vertical; min-height: 90px; font-size: 16px !important; }
 .selected-parte { font-size: 18px; font-weight: 600; color: #1D9E75; margin: 8px 0 4px; padding: 10px 14px; background: #E1F5EE; border-radius: 10px; }
 </style>
 </head>
 <body>
-<div id="app" class="wrap"><div class="spinner">Cargando catálogos...</div></div>
+<div id="app" class="wrap"><div class="spinner">Cargando catalogos...</div></div>
 <script>
-const SHEETS_URL = "https://script.google.com/a/macros/makenmetal.com.mx/s/AKfycbwBZ4Td2cjH3CbrESY8PVBIop3mcbOtVQrwqN51pjMCKp47YEs4og2uOd-s3ZQ-kLUwUg/exec";
-const OWNER_PIN = "9473";
-const AREAS = [
+var SHEETS_URL = "https://script.google.com/a/macros/makenmetal.com.mx/s/AKfycbwBZ4Td2cjH3CbrESY8PVBIop3mcbOtVQrwqN51pjMCKp47YEs4og2uOd-s3ZQ-kLUwUg/exec";
+var OWNER_PIN = "9473";
+var AREAS = [
   { area:"Torno", maquinas:["Puma 1","Puma 2","Haas 1","Haas 2"] },
   { area:"Centro de Maquinado", maquinas:["Doosan 2","Doosan 3"] },
   { area:"Corte", maquinas:["Amada"] },
@@ -64,31 +65,35 @@ const AREAS = [
   { area:"Soldadura", maquinas:["Soldadura 1","Soldadura 2"] },
   { area:"Detallado", maquinas:["Detallado ZP","Detallado Final"] },
   { area:"Avellanado", maquinas:["Revolver"] },
-  { area:"Roscado", maquinas:["Machueleadora"] },
+  { area:"Roscado", maquinas:["Machueleadora"] }
 ];
-const TIPOS_MANTO_DEFAULT = ["Preventivo","Correctivo","Predictivo","Emergencia"];
-const OPS_POR_AREA = {
-  "corte":           ["10a","10b","10c","10d"],
-  "torno":           ["20a","20b","20c","20d"],
-  "centro_maquinado":["50a","50b","50c","50d"],
-  "rect_exterior":   ["90a","90b","90c","90d"],
-  "rect_interior":   ["100a","100b","100c","100d"],
-  "avellanado":      ["400a","400b","400c","400d"],
-  "roscado":         ["500a","500b","500c","500d"],
+var TIPOS_MANTO_DEFAULT = ["Preventivo","Correctivo","Predictivo","Emergencia"];
+var OPS_POR_AREA = {
+  "corte":            ["10a","10b","10c","10d"],
+  "torno":            ["20a","20b","20c","20d"],
+  "centro_maquinado": ["50a","50b","50c","50d"],
+  "rect_exterior":    ["90a","90b","90c","90d"],
+  "rect_interior":    ["100a","100b","100c","100d"],
+  "avellanado":       ["400a","400b","400c","400d"],
+  "roscado":          ["500a","500b","500c","500d"],
+  "ensamble":         ["700a","700b","700c","700d"],
+  "soldadura":        ["800a","800b","800c","800d"],
+  "detallado":        ["900a","900b","900c","900d"]
 };
-let CAT = null;
-let S = {
-  view:"loading", empleado:null, loginError:false,
-  turno:getTurno(), fechaManual:null, tab:"produccion", sending:false,
-  history:[], submitted:null,
-  prod:{ maquina:"", partidas:[mkPartida()] },
-  setup:{ maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" },
-  manto:{ maquina:"", tipo:"", descripcion:"", horas:"" },
-  resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
+var CAT = null;
+var S = {
+  view: "loading", empleado: null, loginError: false,
+  turno: getTurno(), fechaManual: null, tab: "produccion", sending: false,
+  history: [], submitted: null,
+  prod:   { maquina: "", partidas: [mkPartida()] },
+  setup:  { maquina: "", noParte: "", operacion: "", horas: "", ot: "", q: "" },
+  manto:  { maquina: "", tipo: "", descripcion: "", horas: "" },
+  resumen:{ fecha: getFechaHoy(), turno: getTurno(), loading: false, data: null }
 };
 
-function mkPartida() { return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", desc:"", q:"" }; }
-
+function mkPartida() {
+  return { noParte: "", operacion: "", piezas: "", horas: "", ot: "", desc: "", q: "" };
+}
 function getTurno() {
   var h = new Date().getHours();
   return (h >= 7 && h < 19) ? "1ro" : "3ro";
@@ -96,36 +101,39 @@ function getTurno() {
 function getFechaHoy() {
   var now = new Date();
   if (now.getHours() < 7) now.setDate(now.getDate() - 1);
-  var d = String(now.getDate()).padStart(2,'0');
-  var m = String(now.getMonth()+1).padStart(2,'0');
+  var d = String(now.getDate()).padStart(2,"0");
+  var m = String(now.getMonth() + 1).padStart(2,"0");
   return d + "/" + m + "/" + now.getFullYear();
 }
 function getFecha() { return S.fechaManual || getFechaHoy(); }
-function getHora() { return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); }
+function getHora()  { return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}); }
 
 function getMaqArea(m) {
   if (!m) return "";
   var s = m.toLowerCase();
-  if (s.includes("machueleadora")) return "roscado";
-  if (s.includes("doosan")) return "centro_maquinado";
-  if (s.includes("puma") || s.includes("haas")) return "torno";
-  if (s.includes("okamoto")) return "rect_interior";
-  if (s.includes("bsa") || s.includes("kellen")) return "rect_exterior";
-  if (s.includes("revolver")) return "avellanado";
-  if (s.includes("amada")) return "corte";
+  if (s.indexOf("machueleadora") >= 0) return "roscado";
+  if (s.indexOf("doosan") >= 0) return "centro_maquinado";
+  if (s.indexOf("puma") >= 0 || s.indexOf("haas") >= 0) return "torno";
+  if (s.indexOf("okamoto") >= 0) return "rect_interior";
+  if (s.indexOf("bsa") >= 0 || s.indexOf("kellen") >= 0) return "rect_exterior";
+  if (s.indexOf("revolver") >= 0) return "avellanado";
+  if (s.indexOf("amada") >= 0) return "corte";
+  if (s.indexOf("ensamble") >= 0) return "ensamble";
+  if (s.indexOf("soldadura") >= 0) return "soldadura";
+  if (s.indexOf("detallado") >= 0) return "detallado";
   return "otro";
 }
 function getTipoOp(cod) {
   var n = parseInt(cod);
   var op = isNaN(n)
-    ? CAT.operaciones.find(function(o){ return String(o.codigo).toLowerCase() === String(cod).toLowerCase(); })
-    : CAT.operaciones.find(function(o){ return parseInt(o.codigo) === n; });
+    ? CAT.operaciones.filter(function(o){ return String(o.codigo).toLowerCase() === String(cod).toLowerCase(); })[0]
+    : CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === n; })[0];
   return op ? op.nombre : cod;
 }
 function opLabel(op, maq) {
   var area = getMaqArea(maq);
   if (op === "50a" && area === "centro_maquinado") {
-    var r = CAT.operaciones.find(function(o){ return parseInt(o.codigo) === 500; });
+    var r = CAT.operaciones.filter(function(o){ return parseInt(o.codigo) === 500; })[0];
     return (r ? r.nombre : "Roscado") + " (" + op + ")";
   }
   return getTipoOp(op) + " (" + op + ")";
@@ -133,431 +141,560 @@ function opLabel(op, maq) {
 function getOps(noParte, maq) {
   if (!noParte || noParte === "Otro" || !CAT.partes[noParte]) return [];
   var area = getMaqArea(maq);
-  return Object.keys(CAT.partes[noParte]).filter(function(op){ return !(op === "500a" && area === "centro_maquinado"); });
+  return Object.keys(CAT.partes[noParte]).filter(function(op){
+    return !(op === "500a" && area === "centro_maquinado");
+  });
 }
 function getOpsParaMaquina(maq) {
   var area = getMaqArea(maq);
   return OPS_POR_AREA[area] || ["20a","20b","20c","20d"];
 }
-function tiposManto() { return (CAT && CAT.tiposmanto && CAT.tiposmanto.length) ? CAT.tiposmanto : TIPOS_MANTO_DEFAULT; }
-
-function fetchCat(a) { return fetch(SHEETS_URL + "?action=" + a, {method:"GET",mode:"cors",redirect:"follow"}).then(function(r){ return r.json(); }); }
-function enviar(data) { return fetch(SHEETS_URL, {method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}); }
+function tiposManto() {
+  return (CAT && CAT.tiposmanto && CAT.tiposmanto.length) ? CAT.tiposmanto : TIPOS_MANTO_DEFAULT;
+}
+function fetchCat(a) {
+  return fetch(SHEETS_URL + "?action=" + a, { method:"GET", mode:"cors", redirect:"follow" }).then(function(r){ return r.json(); });
+}
+function enviar(data) {
+  return fetch(SHEETS_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data) });
+}
 function cargarResumen() {
   S.resumen.loading = true; render();
-  fetch(SHEETS_URL + "?action=reportes&fecha=" + encodeURIComponent(S.resumen.fecha) + "&turno=" + encodeURIComponent(S.resumen.turno), {method:"GET",mode:"cors",redirect:"follow"})
+  fetch(SHEETS_URL + "?action=reportes&fecha=" + encodeURIComponent(S.resumen.fecha) + "&turno=" + encodeURIComponent(S.resumen.turno), { method:"GET", mode:"cors", redirect:"follow" })
     .then(function(r){ return r.json(); })
     .then(function(data){ S.resumen.data = data; S.resumen.loading = false; render(); })
     .catch(function(){ S.resumen.data = []; S.resumen.loading = false; render(); });
 }
 
-function setTab(t){ S.tab=t; render(); }
-function setTurno(t){ S.turno=t; render(); }
-function setMaq(ns,maq){
-  if(ns==="prod") S.prod.maquina=maq;
-  else if(ns==="setup") S.setup.maquina=maq;
-  else if(ns==="manto") S.manto.maquina=maq;
+function setTab(t)       { S.tab = t; render(); }
+function setTurno(t)     { S.turno = t; render(); }
+function setRTurno(t)    { S.resumen.turno = t; render(); }
+function selManto(t)     { S.manto.tipo = t; render(); }
+function delPartida(i)   { S.prod.partidas.splice(i, 1); render(); }
+function addPartida()    { S.prod.partidas.push(mkPartida()); render(); }
+function doSalir()       { S.empleado = null; S.view = "login"; render(); }
+function doNuevo()       { S.submitted = null; S.view = "main"; render(); }
+function doSalirResumen(){ S.view = "login"; render(); }
+function doBuscarResumen(){
+  var inp = document.getElementById("resumenFecha");
+  if (inp) S.resumen.fecha = inp.value;
+  cargarResumen();
+}
+function setMaq(ns, maq) {
+  if (ns === "prod") S.prod.maquina = maq;
+  else if (ns === "setup") S.setup.maquina = maq;
+  else if (ns === "manto") S.manto.maquina = maq;
   render();
 }
-function setOp(ns,op){
-  if(ns.startsWith("prod_")){ var i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].operacion=op; }
-  else if(ns==="setup") S.setup.operacion=op;
+function setOp(ns, op) {
+  if (ns.indexOf("prod_") === 0) { var i = parseInt(ns.replace("prod_","")); S.prod.partidas[i].operacion = op; }
+  else if (ns === "setup") S.setup.operacion = op;
   render();
 }
-function selManto(t){ S.manto.tipo=t; render(); }
-function selParte(ns,parte){
-  if(ns.startsWith("prod_")){ var i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].noParte=parte; S.prod.partidas[i].q=parte; S.prod.partidas[i].operacion=""; S.prod.partidas[i].desc=""; }
-  else if(ns==="setup"){ S.setup.noParte=parte; S.setup.q=parte; S.setup.operacion=""; }
+function selParte(ns, parte) {
+  if (ns.indexOf("prod_") === 0) {
+    var i = parseInt(ns.replace("prod_",""));
+    S.prod.partidas[i].noParte = parte;
+    S.prod.partidas[i].q = parte;
+    S.prod.partidas[i].operacion = "";
+    S.prod.partidas[i].desc = "";
+  } else if (ns === "setup") {
+    S.setup.noParte = parte;
+    S.setup.q = parte;
+    S.setup.operacion = "";
+  }
   render();
 }
-function delPartida(i){ S.prod.partidas.splice(i,1); render(); }
-function addPartida(){ S.prod.partidas.push(mkPartida()); render(); }
-function doSalir(){ S.empleado=null; S.view="login"; render(); }
-function doNuevo(){ S.submitted=null; S.view="main"; render(); }
-function doSalirResumen(){ S.view="login"; render(); }
-function setRTurno(t){ S.resumen.turno=t; render(); }
-function doBuscarResumen(){ var inp=document.getElementById("resumenFecha"); if(inp) S.resumen.fecha=inp.value; cargarResumen(); }
+function doLogin(val) {
+  var str = String(val).trim();
+  if (str === OWNER_PIN) { S.view = "resumen"; cargarResumen(); render(); return; }
+  var n = parseInt(str);
+  var emp = null;
+  for (var i = 0; i < CAT.empleados.length; i++) {
+    if (parseInt(CAT.empleados[i].numero) === n) { emp = CAT.empleados[i]; break; }
+  }
+  if (emp) { S.empleado = emp; S.loginError = false; S.view = "main"; render(); }
+  else { S.loginError = true; render(); }
+}
+function soloNumeros(e) {
+  var k = e.keyCode || e.which;
+  if (k === 8 || k === 9 || k === 46 || (k >= 48 && k <= 57) || (k >= 96 && k <= 105)) return true;
+  e.preventDefault();
+}
 
-function render(){
-  var app=document.getElementById("app");
-  if(S.view==="loading"){ app.innerHTML='<div class="spinner">Cargando catálogos...</div>'; return; }
-  if(S.view==="login"){ app.innerHTML=buildLogin(); bindLogin(); return; }
-  if(S.view==="done"){ app.innerHTML=buildDone(); return; }
-  if(S.view==="resumen"){ app.innerHTML=buildResumen(); bindResumen(); return; }
-  app.innerHTML=buildMain(); bindMain();
+function render() {
+  var app = document.getElementById("app");
+  if (S.view === "loading")  { app.innerHTML = buildSpinner(); return; }
+  if (S.view === "login")    { app.innerHTML = buildLogin();   bindLogin();   return; }
+  if (S.view === "done")     { app.innerHTML = buildDone();    return; }
+  if (S.view === "resumen")  { app.innerHTML = buildResumen(); bindResumen(); return; }
+  app.innerHTML = buildMain(); bindMain();
 }
 
-function buildLogin(){
+function buildSpinner() { return '<div class="spinner">Cargando catalogos...</div>'; }
+
+function buildLogin() {
   return '<div style="max-width:400px;margin:0 auto;padding:3rem 1.5rem">'
-    +'<div style="background:#000;border-radius:10px;padding:8px 14px;display:inline-block;margin-bottom:16px">'
-    +'<span style="color:#fff;font-weight:900;font-size:28px;letter-spacing:-1px">MK</span>'
-    +'<span style="color:#1D9E75;font-weight:900;font-size:28px">M</span></div>'
-    +'<p style="font-size:15px;color:#888;margin-bottom:40px">Reporte de producción</p>'
-    +'<label>Número de empleado</label>'
-    +'<input id="loginNum" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">'
-    +(S.loginError?'<p class="error-msg">Número no encontrado.</p>':'')
-    +'<button class="send-btn" style="background:#1D9E75" onclick="doLogin(document.getElementById(\'loginNum\').value)">Entrar</button>'
-    +'</div>';
+    + '<div style="background:#000;border-radius:10px;padding:8px 14px;display:inline-block;margin-bottom:16px">'
+    + '<span style="color:#fff;font-weight:900;font-size:28px;letter-spacing:-1px">MK</span>'
+    + '<span style="color:#1D9E75;font-weight:900;font-size:28px">M</span></div>'
+    + '<p style="font-size:15px;color:#888;margin-bottom:40px">Reporte de produccion</p>'
+    + '<label>Numero de empleado</label>'
+    + '<input id="loginNum" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="Ej. 264" style="font-size:28px;padding:14px 16px;letter-spacing:4px;margin-bottom:8px">'
+    + (S.loginError ? '<p class="error-msg">Numero no encontrado.</p>' : '')
+    + '<button class="send-btn" style="background:#1D9E75" id="loginBtn">Entrar</button>'
+    + '</div>';
 }
-function bindLogin(){
-  var inp=document.getElementById("loginNum");
+function bindLogin() {
+  var inp = document.getElementById("loginNum");
+  var btn = document.getElementById("loginBtn");
   inp.focus();
-  inp.addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(inp.value); });
-}
-function doLogin(val){
-  var str=String(val).trim();
-  if(str===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
-  var n=parseInt(str);
-  var emp=CAT.empleados.find(function(e){ return parseInt(e.numero)===n; });
-  if(emp){ S.empleado=emp; S.loginError=false; S.view="main"; render(); }
-  else{ S.loginError=true; render(); }
+  inp.addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(inp.value); });
+  btn.addEventListener("click",   function()  { doLogin(inp.value); });
 }
 
-function buildResumen(){
-  var r=S.resumen, rows=r.data||[];
-  var prod=rows.filter(function(x){ return x.tipo==="Producción"; });
-  var setup=rows.filter(function(x){ return x.tipo==="Setup"; });
-  var manto=rows.filter(function(x){ return x.tipo==="Mantenimiento"; });
-  var byMaq={}, setupByMaq={}, mantoByMaq={};
-  prod.forEach(function(row){ if(!byMaq[row.maquina]) byMaq[row.maquina]=[]; byMaq[row.maquina].push(row); });
+function buildResumen() {
+  var r = S.resumen, rows = r.data || [];
+  var prod  = rows.filter(function(x){ return x.tipo === "Produccion" || x.tipo === "Producción"; });
+  var setup = rows.filter(function(x){ return x.tipo === "Setup"; });
+  var manto = rows.filter(function(x){ return x.tipo === "Mantenimiento"; });
+  var byMaq = {}, setupByMaq = {}, mantoByMaq = {};
+  prod.forEach(function(row){
+    if (!byMaq[row.maquina]) byMaq[row.maquina] = [];
+    byMaq[row.maquina].push(row);
+  });
   setup.forEach(function(row){
-    if(!setupByMaq[row.maquina]) setupByMaq[row.maquina]={horas:0,responsables:[]};
-    setupByMaq[row.maquina].horas+=parseFloat(row.horasSetup)||0;
-    var num=(row.responsable||"").split(" - ")[0];
-    if(num&&setupByMaq[row.maquina].responsables.indexOf(num)===-1) setupByMaq[row.maquina].responsables.push(num);
+    if (!setupByMaq[row.maquina]) setupByMaq[row.maquina] = { horas:0, responsables:[] };
+    setupByMaq[row.maquina].horas += parseFloat(row.horasSetup) || 0;
+    var num = (row.responsable || "").split(" - ")[0];
+    if (num && setupByMaq[row.maquina].responsables.indexOf(num) === -1) setupByMaq[row.maquina].responsables.push(num);
   });
   manto.forEach(function(row){
-    if(!mantoByMaq[row.maquina]) mantoByMaq[row.maquina]={horas:0,tipos:[]};
-    mantoByMaq[row.maquina].horas+=parseFloat(row.horasManto)||0;
-    if(row.tipoManto&&mantoByMaq[row.maquina].tipos.indexOf(row.tipoManto)===-1) mantoByMaq[row.maquina].tipos.push(row.tipoManto);
+    if (!mantoByMaq[row.maquina]) mantoByMaq[row.maquina] = { horas:0, tipos:[] };
+    mantoByMaq[row.maquina].horas += parseFloat(row.horasManto) || 0;
+    if (row.tipoManto && mantoByMaq[row.maquina].tipos.indexOf(row.tipoManto) === -1) mantoByMaq[row.maquina].tipos.push(row.tipoManto);
   });
-  var allMaq=[...new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)])].sort();
-  var totalPiezas=prod.reduce(function(a,r){ return a+(parseInt(r.piezas)||0); },0);
-  var totalSetup=setup.reduce(function(a,r){ return a+(parseFloat(r.horasSetup)||0); },0);
-  var totalManto=manto.reduce(function(a,r){ return a+(parseFloat(r.horasManto)||0); },0);
+  var keys1 = Object.keys(byMaq), keys2 = Object.keys(setupByMaq), keys3 = Object.keys(mantoByMaq);
+  var allSet = {};
+  keys1.concat(keys2).concat(keys3).forEach(function(k){ allSet[k] = 1; });
+  var allMaq = Object.keys(allSet).sort();
+  var totalPiezas = prod.reduce(function(a,r){ return a + (parseInt(r.piezas) || 0); }, 0);
+  var totalSetup  = setup.reduce(function(a,r){ return a + (parseFloat(r.horasSetup) || 0); }, 0);
+  var totalManto  = manto.reduce(function(a,r){ return a + (parseFloat(r.horasManto) || 0); }, 0);
 
-  var estadoMaquinas='<div class="card" style="margin-bottom:16px">'
-    +'<p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MÁQUINAS</p>'
-    +AREAS.map(function(a){
-      return '<p class="area-label" style="margin-top:8px">'+a.area+'</p>'
-        +a.maquinas.map(function(m){
-          var tP=byMaq[m]&&byMaq[m].length>0;
-          var tS=setupByMaq[m]&&setupByMaq[m].horas>0;
-          var tM=mantoByMaq[m]&&mantoByMaq[m].horas>0;
-          var activa=tP||tS||tM;
-          var badges=[
-            tP?'<span style="font-size:11px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:2px 8px;border-radius:8px">Prod</span>':"",
-            tS?'<span style="font-size:11px;font-weight:600;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:8px">Setup</span>':"",
-            tM?'<span style="font-size:11px;font-weight:600;color:#BA7517;background:#FAEEDA;padding:2px 8px;border-radius:8px">Manto</span>':"",
-          ].filter(Boolean).join(" ");
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
-            +'<span style="font-size:15px;font-weight:500">'+m+'</span>'
-            +'<div style="display:flex;gap:4px">'+(activa?badges:'<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>')+'</div>'
-            +'</div>';
-        }).join("");
-    }).join("")
-    +'</div>';
+  var estadoHTML = '<div class="card" style="margin-bottom:16px">'
+    + '<p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MAQUINAS</p>'
+    + AREAS.map(function(a){
+        return '<p class="area-label" style="margin-top:8px">' + a.area + '</p>'
+          + a.maquinas.map(function(m){
+              var tP = byMaq[m] && byMaq[m].length > 0;
+              var tS = setupByMaq[m] && setupByMaq[m].horas > 0;
+              var tM = mantoByMaq[m] && mantoByMaq[m].horas > 0;
+              var badges = [
+                tP ? '<span style="font-size:11px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:2px 8px;border-radius:8px">Prod</span>' : "",
+                tS ? '<span style="font-size:11px;font-weight:600;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:8px">Setup</span>' : "",
+                tM ? '<span style="font-size:11px;font-weight:600;color:#BA7517;background:#FAEEDA;padding:2px 8px;border-radius:8px">Manto</span>' : ""
+              ].filter(function(x){ return x; }).join(" ");
+              var sinReporte = '<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>';
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
+                + '<span style="font-size:15px;font-weight:500">' + m + '</span>'
+                + '<div style="display:flex;gap:4px">' + (badges || sinReporte) + '</div>'
+                + '</div>';
+            }).join("");
+      }).join("")
+    + '</div>';
 
-  var detalle=allMaq.length===0
-    ?'<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>'
-    :allMaq.map(function(maq){
-      var filas=byMaq[maq]||[], hSetup=setupByMaq[maq], hManto=mantoByMaq[maq];
-      return '<div class="card" style="margin-bottom:12px">'
-        +'<p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">'+maq+'</p>'
-        +(filas.length?'<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCIÓN</p>'
-          +filas.map(function(f){
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
-              +'<div><span style="font-size:15px;font-weight:500">'+f.noParte+'</span>'
-              +'<span style="font-size:12px;color:#888;margin-left:6px">'+(f.tipoOperacion||f.operacion||"")+'</span></div>'
-              +'<div style="text-align:right">'
-              +'<span style="font-size:20px;font-weight:700">'+(f.piezas||"—")+'</span>'
-              +(f.noParte&&f.noParte.startsWith("Otro")&&f.horasSetup?'<span style="font-size:12px;color:#1D9E75;display:block">'+f.horasSetup+' hrs</span>':"")
-              +'<span style="font-size:11px;color:#888;display:block">'+((f.responsable||"").split(" - ")[0])+'</span>'
-              +'</div></div>';
-          }).join(""):"")
-        +(hSetup?'<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
-          +'<div><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span>'
-          +'<span style="font-size:11px;color:#888;margin-left:6px">'+hSetup.responsables.join(", ")+'</span></div>'
-          +'<span style="font-size:15px;font-weight:700;color:#185FA5">'+hSetup.horas.toFixed(1)+' hrs</span></div>':"")
-        +(hManto?'<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
-          +'<span style="font-size:13px;color:#BA7517;font-weight:500">Manto · '+hManto.tipos.join(", ")+'</span>'
-          +'<span style="font-size:15px;font-weight:700;color:#BA7517">'+hManto.horas.toFixed(1)+' hrs</span></div>':"")
-        +'</div>';
-    }).join("");
+  var detalleHTML = allMaq.length === 0
+    ? '<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>'
+    : allMaq.map(function(maq){
+        var filas = byMaq[maq] || [];
+        var hSetup = setupByMaq[maq];
+        var hManto = mantoByMaq[maq];
+        return '<div class="card" style="margin-bottom:12px">'
+          + '<p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">' + maq + '</p>'
+          + (filas.length ? '<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCION</p>'
+              + filas.map(function(f){
+                  var esOtro = f.noParte && f.noParte.indexOf("Otro") === 0;
+                  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">'
+                    + '<div><span style="font-size:15px;font-weight:500">' + (f.noParte||"") + '</span>'
+                    + '<span style="font-size:12px;color:#888;margin-left:6px">' + (f.tipoOperacion||f.operacion||"") + '</span></div>'
+                    + '<div style="text-align:right">'
+                    + '<span style="font-size:20px;font-weight:700">' + (f.piezas||"—") + '</span>'
+                    + (esOtro && f.horasSetup ? '<span style="font-size:12px;color:#1D9E75;display:block">' + f.horasSetup + ' hrs</span>' : "")
+                    + '<span style="font-size:11px;color:#888;display:block">' + ((f.responsable||"").split(" - ")[0]) + '</span>'
+                    + '</div></div>';
+                }).join("") : "")
+          + (hSetup ? '<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
+              + '<div><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span>'
+              + '<span style="font-size:11px;color:#888;margin-left:6px">' + hSetup.responsables.join(", ") + '</span></div>'
+              + '<span style="font-size:15px;font-weight:700;color:#185FA5">' + hSetup.horas.toFixed(1) + ' hrs</span></div>' : "")
+          + (hManto ? '<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">'
+              + '<span style="font-size:13px;color:#BA7517;font-weight:500">Manto - ' + hManto.tipos.join(", ") + '</span>'
+              + '<span style="font-size:15px;font-weight:700;color:#BA7517">' + hManto.horas.toFixed(1) + ' hrs</span></div>' : "")
+          + '</div>';
+      }).join("");
 
   return '<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
-    +'<span style="font-weight:600;font-size:18px">Resumen del turno</span>'
-    +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" onclick="doSalirResumen()">Salir</button></div>'
-    +'<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    +'<input type="text" id="resumenFecha" value="'+r.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
-    +'<button class="turno-btn'+(r.turno==="1ro"?" active":"")+'" onclick="setRTurno(\'1ro\')">1ro</button>'
-    +'<button class="turno-btn'+(r.turno==="3ro"?" active":"")+'" onclick="setRTurno(\'3ro\')">3ro</button>'
-    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" onclick="doBuscarResumen()">Buscar</button>'
-    +'</div></div>'
-    +(r.loading?'<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
-      :'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
-      +'<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:28px;font-weight:700;color:#1D9E75">'+totalPiezas+'</p></div>'
-      +'<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">'+totalSetup.toFixed(1)+'</p></div>'
-      +'<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">'+totalManto.toFixed(1)+'</p></div>'
-      +'</div>'+estadoMaquinas+detalle)
-    +'</div>';
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
+    + '<span style="font-weight:600;font-size:18px">Resumen del turno</span>'
+    + '<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div>'
+    + '<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    + '<input type="text" id="resumenFecha" value="' + r.fecha + '" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
+    + '<button class="turno-btn' + (r.turno === "1ro" ? " active" : "") + '" id="rt1">1ro</button>'
+    + '<button class="turno-btn' + (r.turno === "3ro" ? " active" : "") + '" id="rt3">3ro</button>'
+    + '<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="btnBuscar">Buscar</button>'
+    + '</div></div>'
+    + (r.loading ? '<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
+      : '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
+        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:28px;font-weight:700;color:#1D9E75">' + totalPiezas + '</p></div>'
+        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">' + totalSetup.toFixed(1) + '</p></div>'
+        + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">' + totalManto.toFixed(1) + '</p></div>'
+        + '</div>' + estadoHTML + detalleHTML)
+    + '</div>';
 }
-function bindResumen(){
-  var inp=document.getElementById("resumenFecha");
-  if(inp) inp.addEventListener("change",function(e){ S.resumen.fecha=e.target.value; });
+function bindResumen() {
+  document.getElementById("btnSalirRes").addEventListener("click", doSalirResumen);
+  document.getElementById("rt1").addEventListener("click", function(){ setRTurno("1ro"); });
+  document.getElementById("rt3").addEventListener("click", function(){ setRTurno("3ro"); });
+  document.getElementById("btnBuscar").addEventListener("click", doBuscarResumen);
+  var inp = document.getElementById("resumenFecha");
+  if (inp) inp.addEventListener("change", function(e){ S.resumen.fecha = e.target.value; });
 }
 
-function buildDone(){
-  var sub=S.submitted;
-  var hist=S.history.length?'<div style="margin-top:28px"><p style="font-size:14px;color:#888;margin-bottom:10px">Reportes del día</p>'
-    +S.history.map(function(h){
-      var c=h.tipo==='Producción'?'#1D9E75':h.tipo==='Setup'?'#185FA5':'#BA7517';
-      return '<div class="history-item"><div><span style="font-size:15px;font-weight:500">'+h.maquina+'</span><span style="font-size:13px;color:#888;margin-left:8px">'+h.hora+'</span></div>'
-        +'<span class="pill" style="background:'+c+'22;color:'+c+'">'+h.tipo+'</span></div>';
-    }).join("")+'</div>':"";
-
+function buildDone() {
+  var sub = S.submitted;
+  var histHTML = "";
+  if (S.history.length) {
+    histHTML = '<div style="margin-top:28px"><p style="font-size:14px;color:#888;margin-bottom:10px">Reportes del dia</p>';
+    S.history.forEach(function(h){
+      var c = h.tipo === "Produccion" || h.tipo === "Producción" ? "#1D9E75" : h.tipo === "Setup" ? "#185FA5" : "#BA7517";
+      histHTML += '<div class="history-item"><div>'
+        + '<span style="font-size:15px;font-weight:500">' + h.maquina + '</span>'
+        + '<span style="font-size:13px;color:#888;margin-left:8px">' + h.hora + '</span></div>'
+        + '<span class="pill" style="background:' + c + '22;color:' + c + '">' + h.tipo + '</span></div>';
+    });
+    histHTML += '</div>';
+  }
+  var partidasHTML = "";
+  if (sub.tipo === "Produccion" || sub.tipo === "Producción") {
+    sub.partidas.forEach(function(p){
+      partidasHTML += '<div style="border-top:1px solid #eee;padding-top:10px;margin-top:10px">'
+        + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + p.noParte + '</span></div>'
+        + '<div class="info-row"><span class="info-label">OT</span><span class="info-val">' + (p.ot||"—") + '</span></div>'
+        + '<div class="info-row"><span class="info-label">Operacion</span><span class="info-val">' + (p.operacion ? opLabel(p.operacion, sub.maquina) : "—") + '</span></div>'
+        + '<div class="info-row"><span class="info-label">Piezas</span><span class="info-val">' + (p.piezas||"—") + '</span></div>'
+        + (p.noParte === "Otro" ? '<div class="info-row"><span class="info-label">Horas</span><span class="info-val">' + (p.horas||"—") + '</span></div>' : "")
+        + '</div>';
+    });
+  }
   return '<div style="padding:1.5rem 1.25rem">'
-    +'<div style="text-align:center;margin-bottom:28px">'
-    +'<div class="check-icon">✓</div>'
-    +'<p style="font-weight:600;font-size:20px">Reporte enviado</p>'
-    +'<p style="font-size:14px;color:#888;margin-top:6px">'+sub.tipo+' · '+sub.fecha+' · Turno '+sub.turno+'</p></div>'
-    +'<div class="card">'
-    +'<div class="info-row"><span class="info-label">Máquina</span><span class="info-val">'+sub.maquina+'</span></div>'
-    +'<div class="info-row"><span class="info-label">Empleado</span><span class="info-val">'+S.empleado.nombre+'</span></div>'
-    +(sub.tipo==="Producción"?sub.partidas.map(function(p){
-      return '<div style="border-top:1px solid #eee;padding-top:10px;margin-top:10px">'
-        +'<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">'+p.noParte+'</span></div>'
-        +'<div class="info-row"><span class="info-label">OT</span><span class="info-val">'+(p.ot||"—")+'</span></div>'
-        +'<div class="info-row"><span class="info-label">Operación</span><span class="info-val">'+(p.operacion?opLabel(p.operacion,sub.maquina):"—")+'</span></div>'
-        +'<div class="info-row"><span class="info-label">Piezas</span><span class="info-val">'+(p.piezas||"—")+'</span></div>'
-        +(p.noParte==="Otro"?'<div class="info-row"><span class="info-label">Horas</span><span class="info-val">'+(p.horas||"—")+'</span></div>':"")
-        +'</div>';
-    }).join(""):"")
-    +(sub.tipo==="Setup"?'<div class="info-row"><span class="info-label">OT</span><span class="info-val">'+(sub.ot||"—")+'</span></div>'
-      +'<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">'+sub.noParte+'</span></div>'
-      +'<div class="info-row"><span class="info-label">Operación</span><span class="info-val">'+(sub.operacion?opLabel(sub.operacion,sub.maquina):"—")+'</span></div>'
-      +'<div class="info-row"><span class="info-label">Horas setup</span><span class="info-val">'+(sub.horas||"—")+'</span></div>':"")
-    +(sub.tipo==="Mantenimiento"?'<div class="info-row"><span class="info-label">Tipo</span><span class="info-val">'+sub.tipoManto+'</span></div>'
-      +'<div class="info-row"><span class="info-label">Descripción</span><span class="info-val">'+(sub.descripcion||"—")+'</span></div>'
-      +'<div class="info-row"><span class="info-label">Horas</span><span class="info-val">'+(sub.horas||"—")+'</span></div>':"")
-    +'</div>'
-    +'<button class="send-btn" style="background:#1D9E75" onclick="doNuevo()">Nuevo reporte</button>'
-    +'<button style="width:100%;padding:12px 0;border:1px solid #ddd;border-radius:14px;font-size:16px;font-weight:500;background:transparent;color:#888;cursor:pointer;margin-top:8px" onclick="doSalir()">Regresar al inicio</button>'
-    +hist+'</div>';
+    + '<div style="text-align:center;margin-bottom:28px">'
+    + '<div class="check-icon">&#10003;</div>'
+    + '<p style="font-weight:600;font-size:20px">Reporte enviado</p>'
+    + '<p style="font-size:14px;color:#888;margin-top:6px">' + sub.tipo + ' - ' + sub.fecha + ' - Turno ' + sub.turno + '</p></div>'
+    + '<div class="card">'
+    + '<div class="info-row"><span class="info-label">Maquina</span><span class="info-val">' + sub.maquina + '</span></div>'
+    + '<div class="info-row"><span class="info-label">Empleado</span><span class="info-val">' + S.empleado.nombre + '</span></div>'
+    + partidasHTML
+    + (sub.tipo === "Setup" ? '<div class="info-row"><span class="info-label">OT</span><span class="info-val">' + (sub.ot||"—") + '</span></div>'
+        + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + sub.noParte + '</span></div>'
+        + '<div class="info-row"><span class="info-label">Horas setup</span><span class="info-val">' + (sub.horas||"—") + '</span></div>' : "")
+    + (sub.tipo === "Mantenimiento" ? '<div class="info-row"><span class="info-label">Tipo</span><span class="info-val">' + sub.tipoManto + '</span></div>'
+        + '<div class="info-row"><span class="info-label">Horas</span><span class="info-val">' + (sub.horas||"—") + '</span></div>' : "")
+    + '</div>'
+    + '<button class="send-btn" style="background:#1D9E75" id="btnNuevo">Nuevo reporte</button>'
+    + '<button style="width:100%;padding:12px 0;border:1px solid #ddd;border-radius:14px;font-size:16px;font-weight:500;background:transparent;color:#888;cursor:pointer;margin-top:8px" id="btnIni">Regresar al inicio</button>'
+    + histHTML + '</div>';
 }
 
-function buildMaquinas(ns){
-  var sel=ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:S.manto.maquina;
-  return AREAS.map(function(a){
-    var cols=Math.min(a.maquinas.length,2);
-    return '<p class="area-label">'+a.area+'</p>'
-      +'<div class="btn-grid" style="grid-template-columns:repeat('+cols+',1fr)">'
-      +a.maquinas.map(function(m){
-        return '<button class="big-btn'+(sel===m?" active":"")+'" onclick="setMaq(\''+ns+'\',\''+m+'\')">'+m+'</button>';
-      }).join("")+'</div>';
-  }).join("");
-}
-
-function buildBuscador(ns,q,noParte){
-  var PART_LIST=["Otro"].concat(Object.keys(CAT.partes).sort());
-  var lista=q.length>1?PART_LIST.filter(function(p){ return p.toLowerCase().includes(q.toLowerCase()); }).slice(0,15):[];
-  var selected=noParte?'<div class="selected-parte">✓ '+noParte+'</div>':"";
-  var results=lista.length&&!noParte?'<div class="search-results">'+lista.map(function(p){
-    return '<button class="search-result-btn" onclick="selParte(\''+ns+'\',\''+p+'\')">'+p+'</button>';
-  }).join("")+'</div>':"";
-  return '<div class="field"><label>No. de parte</label>'
-    +'<input type="text" inputmode="text" placeholder="Escribe para buscar..." value="'+q+'" data-search="'+ns+'" autocomplete="off">'
-    +selected+results+'</div>';
-}
-
-function buildOpBtns(ops,selected,maq,ns){
-  if(!ops.length) return "";
-  return '<div class="field"><label>Operación</label>'
-    +'<div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
-    +ops.map(function(o){
-      return '<button class="big-btn'+(selected===o?" active":"")+'" style="font-size:14px" onclick="setOp(\''+ns+'\',\''+o+'\')">'+opLabel(o,maq)+'</button>';
-    }).join("")+'</div></div>';
-}
-
-function buildProd(){
-  var p=S.prod;
-  return '<div class="section"><label>Máquina</label>'+buildMaquinas("prod")+'</div>'
-    +p.partidas.map(function(pt,i){
-      var esOtro=pt.noParte==="Otro";
-      var ops=esOtro?[]:getOps(pt.noParte,p.maquina);
-      var opsOtro=esOtro?getOpsParaMaquina(p.maquina):[];
-      var tc=!esOtro&&pt.noParte&&pt.operacion&&CAT.partes[pt.noParte]?CAT.partes[pt.noParte][pt.operacion]:null;
-      var area=getMaqArea(p.maquina);
-      return '<div class="card">'
-        +'<div class="partida-header"><span style="font-size:16px;font-weight:600">Partida '+(i+1)+'</span>'
-        +(i>0?'<button class="del-btn" onclick="delPartida('+i+')">Eliminar</button>':"")+'</div>'
-        +buildBuscador("prod_"+i,pt.q||"",pt.noParte)
-        +(esOtro?'<div class="field"><label>¿Qué se realizó?</label>'
-          +'<textarea placeholder="Describe brevemente lo que se realizó..." data-desc="'+i+'" style="font-size:16px;min-height:80px">'+(pt.desc||"")+'</textarea></div>':"")
-        +'<div class="field"><label>Orden de trabajo</label>'
-          +'<input type="number" inputmode="numeric" placeholder="550214" data-ot="'+i+'" value="'+(pt.ot||"")+'" style="font-size:22px;font-weight:600;padding:14px;" onkeydown="return event.keyCode===8||event.keyCode===9||event.keyCode===46||(event.keyCode>=48&&event.keyCode<=57)||(event.keyCode>=96&&event.keyCode<=105)">'
-          +'</div>'
-        +(!esOtro&&pt.noParte&&ops.length?buildOpBtns(ops,pt.operacion,p.maquina,"prod_"+i):"")
-        +(esOtro&&opsOtro.length?'<div class="field"><label>Operación</label>'
-          +'<div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
-          +opsOtro.map(function(o){
-            return '<button class="big-btn'+(pt.operacion===o?" active":"")+'" style="font-size:14px" onclick="setOp(\'prod_'+i+'\',\''+o+'\')">'+opLabel(o,p.maquina)+'</button>';
-          }).join("")+'</div></div>':"")
-        +(area==="torno"&&pt.operacion==="100a"?'<div class="torno-note">Rectificado Interior en Torno — reportado como 100s</div>':"")
-        +(tc?'<div class="tc-note">Tiempo de ciclo: <strong>'+tc+' min</strong></div>':"")
-        +'<div class="field"><label>Piezas</label>'
-          +'<input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="'+i+'" value="'+pt.piezas+'"></div>'
-        +(esOtro?'<div class="field"><label>Horas</label>'
-          +'<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="'+i+'" value="'+(pt.horas||"")+'" step="0.5"></div>':"")
-        +'</div>';
-    }).join("")
-    +'<button class="add-btn" onclick="addPartida()">+ Agregar otra partida</button>'
-    +'<button class="send-btn" style="background:#1D9E75" id="sendProd" '+(S.sending?"disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte")+'</button>';
-}
-
-function buildSetup(){
-  var s=S.setup;
-  var ops=s.noParte&&s.noParte!=="Otro"&&CAT.partes[s.noParte]?Object.keys(CAT.partes[s.noParte]):[];
-  return '<div class="section"><label>Máquina</label>'+buildMaquinas("setup")+'</div>'
-    +'<div class="card">'
-    +buildBuscador("setup",s.q||"",s.noParte)
-    +'<div class="field"><label>Orden de trabajo</label>'
-      +'<input type="number" inputmode="numeric" placeholder="550214" id="setupOT" value="'+(s.ot||"")+'" style="font-size:22px;font-weight:600;padding:14px;" onkeydown="return event.keyCode===8||event.keyCode===9||event.keyCode===46||(event.keyCode>=48&&event.keyCode<=57)||(event.keyCode>=96&&event.keyCode<=105)">'
-      +'</div>'
-    +(s.noParte&&ops.length?buildOpBtns(ops,s.operacion,s.maquina,"setup"):"")
-    +'<div class="field"><label>Horas de setup</label>'
-      +'<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="'+s.horas+'" step="0.5"></div>'
-    +'</div>'
-    +'<button class="send-btn" style="background:#185FA5" id="sendSetup" '+(S.sending?"disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte de setup")+'</button>';
-}
-
-function buildManto(){
-  var m=S.manto;
-  return '<div class="section"><label>Máquina</label>'+buildMaquinas("manto")+'</div>'
-    +'<div class="card">'
-    +'<div class="field"><label>Tipo de mantenimiento</label>'
-      +'<div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
-      +tiposManto().map(function(t){
-        return '<button class="big-btn'+(m.tipo===t?" active":"")+'" onclick="selManto(\''+t+'\')">'+t+'</button>';
-      }).join("")+'</div></div>'
-    +'<div class="field"><label>Descripción</label>'
-      +'<textarea id="mantoDesc" placeholder="Describe el trabajo realizado...">'+m.descripcion+'</textarea></div>'
-    +'<div class="field"><label>Horas de mantenimiento</label>'
-      +'<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="mantoHoras" value="'+m.horas+'" step="0.5"></div>'
-    +'</div>'
-    +'<button class="send-btn" style="background:#BA7517" id="sendManto" '+(S.sending?"disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte de mantenimiento")+'</button>';
-}
-
-function buildMain(){
-  var fecha=getFecha();
-  var header='<div class="header">'
-    +'<div style="background:#000;border-radius:8px;padding:4px 8px;display:inline-block">'
-    +'<span style="color:#fff;font-weight:900;font-size:22px;letter-spacing:-1px">MK</span>'
-    +'<span style="color:#1D9E75;font-weight:900;font-size:22px">M</span></div>'
-    +'<div style="text-align:right">'
-    +'<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px;align-items:center">'
-    +'<input type="text" id="fechaInput" value="'+fecha+'" placeholder="dd/mm/yyyy" style="width:115px;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff;font-weight:500"></div>'
-    +'<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">'
-    +'<span style="font-size:13px;color:#888;line-height:26px">Turno</span>'
-    +'<button class="turno-btn'+(S.turno==="1ro"?" active":"")+'" onclick="setTurno(\'1ro\')">1ro</button>'
-    +'<button class="turno-btn'+(S.turno==="3ro"?" active":"")+'" onclick="setTurno(\'3ro\')">3ro</button></div>'
-    +'<div style="font-size:12px"><span style="color:#888">'+S.empleado.numero+' · </span>'
-    +'<span style="font-weight:500">'+S.empleado.nombre.split(",")[0]+'</span>'
-    +'<button class="salir" onclick="doSalir()">Salir</button></div>'
-    +'</div></div>';
-  var tabs='<div class="tab-bar">'
-    +'<button class="tab-btn'+(S.tab==="produccion"?" active":"")+'" onclick="setTab(\'produccion\')">Producción</button>'
-    +'<button class="tab-btn'+(S.tab==="setup"?" active":"")+'" onclick="setTab(\'setup\')">Setup</button>'
-    +'<button class="tab-btn'+(S.tab==="manto"?" active":"")+'" onclick="setTab(\'manto\')">Mantenimiento</button>'
-    +'</div>';
-  return header+tabs+(S.tab==="produccion"?buildProd():S.tab==="setup"?buildSetup():buildManto());
-}
-
-function bindMain(){
-  var $=function(id){ return document.getElementById(id); };
-  var on=function(sel,ev,fn){ document.querySelectorAll(sel).forEach(function(el){ el.addEventListener(ev,fn); }); };
-  var fi=$("fechaInput"); if(fi) fi.addEventListener("change",function(e){ S.fechaManual=e.target.value; });
-  on("[data-search]","input",function(e){
-    var ns=e.currentTarget.dataset.search, q=e.currentTarget.value;
-    if(ns.startsWith("prod_")){ var i=parseInt(ns.replace("prod_","")); S.prod.partidas[i].q=q; S.prod.partidas[i].noParte=""; S.prod.partidas[i].operacion=""; S.prod.partidas[i].desc=""; }
-    else if(ns==="setup"){ S.setup.q=q; S.setup.noParte=""; S.setup.operacion=""; }
-    updateResults(ns,q);
+function buildMaquinas(ns) {
+  var sel = ns === "prod" ? S.prod.maquina : ns === "setup" ? S.setup.maquina : S.manto.maquina;
+  var html = "";
+  AREAS.forEach(function(a){
+    var cols = Math.min(a.maquinas.length, 2);
+    html += '<p class="area-label">' + a.area + '</p><div class="btn-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
+    a.maquinas.forEach(function(m){
+      html += '<button class="big-btn' + (sel === m ? " active" : "") + '" data-ns="' + ns + '" data-maq="' + m + '">' + m + '</button>';
+    });
+    html += '</div>';
   });
-  on("[data-piezas]","input",function(e){ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
-  on("[data-horas]","input",function(e){ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
-  on("[data-ot]","input",function(e){ S.prod.partidas[parseInt(e.currentTarget.dataset.ot)].ot=e.currentTarget.value; });
-  on("[data-desc]","input",function(e){ S.prod.partidas[parseInt(e.currentTarget.dataset.desc)].desc=e.currentTarget.value; });
-  var sh=$("setupHoras"); if(sh) sh.addEventListener("input",function(e){ S.setup.horas=e.currentTarget.value; });
-  var so=$("setupOT"); if(so) so.addEventListener("input",function(e){ S.setup.ot=e.currentTarget.value; });
-  var md=$("mantoDesc"); if(md) md.addEventListener("input",function(e){ S.manto.descripcion=e.currentTarget.value; });
-  var mh=$("mantoHoras"); if(mh) mh.addEventListener("input",function(e){ S.manto.horas=e.currentTarget.value; });
-  var sp=$("sendProd"); if(sp) sp.addEventListener("click",sendProd);
-  var ss=$("sendSetup"); if(ss) ss.addEventListener("click",sendSetup);
-  var sm=$("sendManto"); if(sm) sm.addEventListener("click",sendManto);
+  return html;
 }
 
-function updateResults(ns,q){
-  var PART_LIST=["Otro"].concat(Object.keys(CAT.partes).sort());
-  var lista=q.length>1?PART_LIST.filter(function(p){ return p.toLowerCase().includes(q.toLowerCase()); }).slice(0,15):[];
-  var inputs=document.querySelectorAll('[data-search="'+ns+'"]');
-  if(!inputs.length) return;
-  var wrap=inputs[0].closest(".field"); if(!wrap) return;
-  var sel=wrap.querySelector(".selected-parte"); if(sel) sel.remove();
-  var div=wrap.querySelector(".search-results");
-  if(!lista.length){ if(div) div.remove(); return; }
-  if(!div){ div=document.createElement("div"); div.className="search-results"; wrap.appendChild(div); }
-  div.innerHTML=lista.map(function(p){ return '<button class="search-result-btn" onclick="selParte(\''+ns+'\',\''+p+'\')">'+p+'</button>'; }).join("");
+function buildBuscador(ns, q, noParte) {
+  var PART_LIST = ["Otro"].concat(Object.keys(CAT.partes).sort());
+  var ql = q.toLowerCase();
+  var lista = q.length > 1 ? PART_LIST.filter(function(p){ return p.toLowerCase().indexOf(ql) >= 0; }).slice(0,15) : [];
+  var sel = noParte ? '<div class="selected-parte">&#10003; ' + noParte + '</div>' : "";
+  var res = "";
+  if (lista.length && !noParte) {
+    res = '<div class="search-results">';
+    lista.forEach(function(p){
+      res += '<button class="search-result-btn" data-ns="' + ns + '" data-parte="' + p + '">' + p + '</button>';
+    });
+    res += '</div>';
+  }
+  return '<div class="field"><label>No. de parte</label>'
+    + '<input type="text" inputmode="text" placeholder="Escribe para buscar..." value="' + q + '" data-search="' + ns + '" autocomplete="off">'
+    + sel + res + '</div>';
 }
 
-function sendProd(){
-  if(!S.prod.maquina||!S.prod.partidas[0].noParte) return;
-  for(var x=0;x<S.prod.partidas.length;x++){ if(!S.prod.partidas[x].ot){ alert("La orden de trabajo es obligatoria."); return; } }
-  S.sending=true; render();
-  var fecha=getFecha(), hora=getHora();
-  var promises=S.prod.partidas.filter(function(pt){ return pt.noParte; }).map(function(pt){
-    var esOtro=pt.noParte==="Otro";
-    return enviar({fecha:fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:S.empleado.numero+" - "+S.empleado.nombre,noParte:esOtro?"Otro - "+(pt.desc||""):pt.noParte,ordenTrabajo:pt.ot||"",tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
+function buildOpBtns(ops, selected, maq, ns) {
+  if (!ops.length) return "";
+  var html = '<div class="field"><label>Operacion</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">';
+  ops.forEach(function(o){
+    html += '<button class="big-btn' + (selected === o ? " active" : "") + '" style="font-size:14px" data-ns="' + ns + '" data-op="' + o + '">' + opLabel(o, maq) + '</button>';
+  });
+  return html + '</div></div>';
+}
+
+function buildProd() {
+  var p = S.prod;
+  var html = '<div class="section"><label>Maquina</label>' + buildMaquinas("prod") + '</div>';
+  p.partidas.forEach(function(pt, i){
+    var esOtro = pt.noParte === "Otro";
+    var ops = esOtro ? [] : getOps(pt.noParte, p.maquina);
+    var opsOtro = esOtro ? getOpsParaMaquina(p.maquina) : [];
+    var tc = (!esOtro && pt.noParte && pt.operacion && CAT.partes[pt.noParte]) ? CAT.partes[pt.noParte][pt.operacion] : null;
+    var area = getMaqArea(p.maquina);
+    html += '<div class="card">'
+      + '<div class="partida-header"><span style="font-size:16px;font-weight:600">Partida ' + (i+1) + '</span>'
+      + (i > 0 ? '<button class="del-btn" data-del="' + i + '">Eliminar</button>' : "") + '</div>'
+      + buildBuscador("prod_" + i, pt.q || "", pt.noParte)
+      + (esOtro ? '<div class="field"><label>Que se realizo?</label>'
+          + '<textarea placeholder="Describe brevemente lo que se realizo..." data-desc="' + i + '" style="font-size:16px;min-height:80px">' + (pt.desc||"") + '</textarea></div>' : "")
+      + '<div class="field"><label>Orden de trabajo</label>'
+      + '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="ot-input" placeholder="550214" data-ot="' + i + '" value="' + (pt.ot||"") + '"></div>'
+      + (!esOtro && pt.noParte && ops.length ? buildOpBtns(ops, pt.operacion, p.maquina, "prod_" + i) : "")
+      + (esOtro && opsOtro.length ? '<div class="field"><label>Operacion</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
+          + opsOtro.map(function(o){
+              return '<button class="big-btn' + (pt.operacion === o ? " active" : "") + '" style="font-size:14px" data-ns="prod_' + i + '" data-op="' + o + '">' + opLabel(o, p.maquina) + '</button>';
+            }).join("") + '</div></div>' : "")
+      + (area === "torno" && pt.operacion === "100a" ? '<div class="torno-note">Rectificado Interior en Torno - reportado como 100s</div>' : "")
+      + (tc ? '<div class="tc-note">Tiempo de ciclo: <strong>' + tc + ' min</strong></div>' : "")
+      + '<div class="field"><label>Piezas</label>'
+      + '<input type="number" inputmode="numeric" class="num-input" placeholder="0" data-piezas="' + i + '" value="' + pt.piezas + '"></div>'
+      + (esOtro ? '<div class="field"><label>Horas</label>'
+          + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" data-horas="' + i + '" value="' + (pt.horas||"") + '" step="0.5"></div>' : "")
+      + '</div>';
+  });
+  html += '<button class="add-btn" id="btnAddPartida">+ Agregar otra partida</button>'
+    + '<button class="send-btn" style="background:#1D9E75" id="sendProd"' + (S.sending ? " disabled" : "") + '>'
+    + (S.sending ? "Enviando..." : "Enviar reporte") + '</button>';
+  return html;
+}
+
+function buildSetup() {
+  var s = S.setup;
+  var ops = (s.noParte && s.noParte !== "Otro" && CAT.partes[s.noParte]) ? Object.keys(CAT.partes[s.noParte]) : [];
+  return '<div class="section"><label>Maquina</label>' + buildMaquinas("setup") + '</div>'
+    + '<div class="card">'
+    + buildBuscador("setup", s.q || "", s.noParte)
+    + '<div class="field"><label>Orden de trabajo</label>'
+    + '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="ot-input" placeholder="550214" id="setupOT" value="' + (s.ot||"") + '"></div>'
+    + (s.noParte && ops.length ? buildOpBtns(ops, s.operacion, s.maquina, "setup") : "")
+    + '<div class="field"><label>Horas de setup</label>'
+    + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="' + s.horas + '" step="0.5"></div>'
+    + '</div>'
+    + '<button class="send-btn" style="background:#185FA5" id="sendSetup"' + (S.sending ? " disabled" : "") + '>'
+    + (S.sending ? "Enviando..." : "Enviar reporte de setup") + '</button>';
+}
+
+function buildManto() {
+  var m = S.manto;
+  var tm = tiposManto();
+  var btns = tm.map(function(t){
+    return '<button class="big-btn' + (m.tipo === t ? " active" : "") + '" data-manto="' + t + '">' + t + '</button>';
+  }).join("");
+  return '<div class="section"><label>Maquina</label>' + buildMaquinas("manto") + '</div>'
+    + '<div class="card">'
+    + '<div class="field"><label>Tipo de mantenimiento</label>'
+    + '<div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">' + btns + '</div></div>'
+    + '<div class="field"><label>Descripcion</label>'
+    + '<textarea id="mantoDesc" placeholder="Describe el trabajo realizado...">' + m.descripcion + '</textarea></div>'
+    + '<div class="field"><label>Horas de mantenimiento</label>'
+    + '<input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="mantoHoras" value="' + m.horas + '" step="0.5"></div>'
+    + '</div>'
+    + '<button class="send-btn" style="background:#BA7517" id="sendManto"' + (S.sending ? " disabled" : "") + '>'
+    + (S.sending ? "Enviando..." : "Enviar reporte de mantenimiento") + '</button>';
+}
+
+function buildMain() {
+  var fecha = getFecha();
+  var header = '<div class="header">'
+    + '<div style="background:#000;border-radius:8px;padding:4px 8px;display:inline-block">'
+    + '<span style="color:#fff;font-weight:900;font-size:22px;letter-spacing:-1px">MK</span>'
+    + '<span style="color:#1D9E75;font-weight:900;font-size:22px">M</span></div>'
+    + '<div style="text-align:right">'
+    + '<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px;align-items:center">'
+    + '<input type="text" id="fechaInput" value="' + fecha + '" placeholder="dd/mm/yyyy" style="width:115px;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff;font-weight:500"></div>'
+    + '<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">'
+    + '<span style="font-size:13px;color:#888;line-height:26px">Turno</span>'
+    + '<button class="turno-btn' + (S.turno === "1ro" ? " active" : "") + '" id="t1">1ro</button>'
+    + '<button class="turno-btn' + (S.turno === "3ro" ? " active" : "") + '" id="t3">3ro</button></div>'
+    + '<div style="font-size:12px"><span style="color:#888">' + S.empleado.numero + ' - </span>'
+    + '<span style="font-weight:500">' + S.empleado.nombre.split(",")[0] + '</span>'
+    + '<button class="salir-btn" id="btnSalir">Salir</button></div>'
+    + '</div></div>';
+  var tabs = '<div class="tab-bar">'
+    + '<button class="tab-btn' + (S.tab === "produccion" ? " active" : "") + '" id="tabP">Produccion</button>'
+    + '<button class="tab-btn' + (S.tab === "setup" ? " active" : "") + '" id="tabS">Setup</button>'
+    + '<button class="tab-btn' + (S.tab === "manto" ? " active" : "") + '" id="tabM">Mantenimiento</button>'
+    + '</div>';
+  var body = S.tab === "produccion" ? buildProd() : S.tab === "setup" ? buildSetup() : buildManto();
+  return header + tabs + body;
+}
+
+function bindMain() {
+  var fi = document.getElementById("fechaInput");
+  if (fi) fi.addEventListener("change", function(e){ S.fechaManual = e.target.value; });
+
+  var t1 = document.getElementById("t1"); if (t1) t1.addEventListener("click", function(){ setTurno("1ro"); });
+  var t3 = document.getElementById("t3"); if (t3) t3.addEventListener("click", function(){ setTurno("3ro"); });
+  var bs = document.getElementById("btnSalir"); if (bs) bs.addEventListener("click", doSalir);
+  var tp = document.getElementById("tabP"); if (tp) tp.addEventListener("click", function(){ setTab("produccion"); });
+  var ts = document.getElementById("tabS"); if (ts) ts.addEventListener("click", function(){ setTab("setup"); });
+  var tm = document.getElementById("tabM"); if (tm) tm.addEventListener("click", function(){ setTab("manto"); });
+  var ap = document.getElementById("btnAddPartida"); if (ap) ap.addEventListener("click", addPartida);
+  var sp = document.getElementById("sendProd");  if (sp) sp.addEventListener("click", sendProd);
+  var ss = document.getElementById("sendSetup"); if (ss) ss.addEventListener("click", sendSetup);
+  var sm = document.getElementById("sendManto"); if (sm) sm.addEventListener("click", sendManto);
+
+  var bn = document.getElementById("btnNuevo"); if (bn) bn.addEventListener("click", doNuevo);
+  var bi = document.getElementById("btnIni");   if (bi) bi.addEventListener("click", doSalir);
+
+  document.querySelectorAll("[data-maq]").forEach(function(el){
+    el.addEventListener("click", function(){ setMaq(el.dataset.ns, el.dataset.maq); });
+  });
+  document.querySelectorAll("[data-op]").forEach(function(el){
+    el.addEventListener("click", function(){ setOp(el.dataset.ns, el.dataset.op); });
+  });
+  document.querySelectorAll("[data-manto]").forEach(function(el){
+    el.addEventListener("click", function(){ selManto(el.dataset.manto); });
+  });
+  document.querySelectorAll("[data-del]").forEach(function(el){
+    el.addEventListener("click", function(){ delPartida(parseInt(el.dataset.del)); });
+  });
+  document.querySelectorAll("[data-parte]").forEach(function(el){
+    el.addEventListener("click", function(){ selParte(el.dataset.ns, el.dataset.parte); });
+  });
+  document.querySelectorAll("[data-search]").forEach(function(el){
+    el.addEventListener("input", function(){
+      var ns = el.dataset.search, q = el.value;
+      if (ns.indexOf("prod_") === 0) {
+        var i = parseInt(ns.replace("prod_",""));
+        S.prod.partidas[i].q = q; S.prod.partidas[i].noParte = ""; S.prod.partidas[i].operacion = ""; S.prod.partidas[i].desc = "";
+      } else if (ns === "setup") { S.setup.q = q; S.setup.noParte = ""; S.setup.operacion = ""; }
+      updateResults(ns, q);
+    });
+  });
+  document.querySelectorAll("[data-piezas]").forEach(function(el){
+    el.addEventListener("input", function(){ S.prod.partidas[parseInt(el.dataset.piezas)].piezas = el.value; });
+  });
+  document.querySelectorAll("[data-horas]").forEach(function(el){
+    el.addEventListener("input", function(){ S.prod.partidas[parseInt(el.dataset.horas)].horas = el.value; });
+  });
+  document.querySelectorAll("[data-ot]").forEach(function(el){
+    el.addEventListener("input", function(){ S.prod.partidas[parseInt(el.dataset.ot)].ot = el.value; });
+  });
+  document.querySelectorAll("[data-desc]").forEach(function(el){
+    el.addEventListener("input", function(){ S.prod.partidas[parseInt(el.dataset.desc)].desc = el.value; });
+  });
+  var sh = document.getElementById("setupHoras"); if (sh) sh.addEventListener("input", function(){ S.setup.horas = sh.value; });
+  var so = document.getElementById("setupOT");    if (so) so.addEventListener("input", function(){ S.setup.ot   = so.value; });
+  var md = document.getElementById("mantoDesc");  if (md) md.addEventListener("input", function(){ S.manto.descripcion = md.value; });
+  var mh = document.getElementById("mantoHoras"); if (mh) mh.addEventListener("input", function(){ S.manto.horas = mh.value; });
+}
+
+function updateResults(ns, q) {
+  var PART_LIST = ["Otro"].concat(Object.keys(CAT.partes).sort());
+  var ql = q.toLowerCase();
+  var lista = q.length > 1 ? PART_LIST.filter(function(p){ return p.toLowerCase().indexOf(ql) >= 0; }).slice(0,15) : [];
+  var inputs = document.querySelectorAll('[data-search="' + ns + '"]');
+  if (!inputs.length) return;
+  var wrap = inputs[0].closest(".field"); if (!wrap) return;
+  var sel = wrap.querySelector(".selected-parte"); if (sel) sel.remove();
+  var div = wrap.querySelector(".search-results");
+  if (!lista.length) { if (div) div.remove(); return; }
+  if (!div) { div = document.createElement("div"); div.className = "search-results"; wrap.appendChild(div); }
+  var html = "";
+  lista.forEach(function(p){
+    html += '<button class="search-result-btn" data-ns="' + ns + '" data-parte="' + p + '">' + p + '</button>';
+  });
+  div.innerHTML = html;
+  div.querySelectorAll("[data-parte]").forEach(function(el){
+    el.addEventListener("click", function(){ selParte(el.dataset.ns, el.dataset.parte); });
+  });
+}
+
+function sendProd() {
+  if (!S.prod.maquina || !S.prod.partidas[0].noParte) return;
+  for (var x = 0; x < S.prod.partidas.length; x++) {
+    if (!S.prod.partidas[x].ot) { alert("La orden de trabajo es obligatoria."); return; }
+  }
+  S.sending = true; render();
+  var fecha = getFecha(), hora = getHora();
+  var promises = S.prod.partidas.filter(function(pt){ return pt.noParte; }).map(function(pt){
+    var esOtro = pt.noParte === "Otro";
+    return enviar({ fecha:fecha, turno:S.turno, tipo:"Produccion", maquina:S.prod.maquina,
+      responsable: S.empleado.numero + " - " + S.empleado.nombre,
+      noParte: esOtro ? "Otro - " + (pt.desc||"") : pt.noParte,
+      ordenTrabajo: pt.ot || "", tipoOperacion: pt.operacion ? getTipoOp(pt.operacion) : "",
+      operacion: pt.operacion, piezas: esOtro ? "" : pt.piezas,
+      horasSetup: esOtro ? pt.horas : "", horasManto:"", tipoManto:"", descripcion:"" });
   });
   Promise.all(promises).then(function(){
-    S.history.unshift({tipo:"Producción",fecha:fecha,hora:hora,turno:S.turno,maquina:S.prod.maquina});
-    S.submitted={tipo:"Producción",fecha:fecha,hora:hora,turno:S.turno,maquina:S.prod.maquina,partidas:S.prod.partidas.slice()};
-    S.prod={maquina:"",partidas:[mkPartida()]};
-    S.sending=false; S.view="done"; render();
+    S.history.unshift({ tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina });
+    S.submitted = { tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina, partidas: S.prod.partidas.slice() };
+    S.prod = { maquina:"", partidas:[mkPartida()] };
+    S.sending = false; S.view = "done"; render();
   });
 }
 
-function sendSetup(){
-  if(!S.setup.maquina||!S.setup.noParte) return;
-  if(!S.setup.ot){ alert("La orden de trabajo es obligatoria."); return; }
-  S.sending=true; render();
-  var fecha=getFecha(), hora=getHora();
-  enviar({fecha:fecha,turno:S.turno,tipo:"Setup",maquina:S.setup.maquina,responsable:S.empleado.numero+" - "+S.empleado.nombre,noParte:S.setup.noParte,ordenTrabajo:S.setup.ot||"",tipoOperacion:S.setup.operacion?getTipoOp(S.setup.operacion):"",operacion:S.setup.operacion,piezas:"",horasSetup:S.setup.horas,horasManto:"",tipoManto:"",descripcion:""}).then(function(){
-    S.history.unshift({tipo:"Setup",fecha:fecha,hora:hora,turno:S.turno,maquina:S.setup.maquina});
-    S.submitted={tipo:"Setup",fecha:fecha,hora:hora,turno:S.turno,maquina:S.setup.maquina,noParte:S.setup.noParte,operacion:S.setup.operacion,horas:S.setup.horas,ot:S.setup.ot};
-    S.setup={maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""};
-    S.sending=false; S.view="done"; render();
+function sendSetup() {
+  if (!S.setup.maquina || !S.setup.noParte) return;
+  if (!S.setup.ot) { alert("La orden de trabajo es obligatoria."); return; }
+  S.sending = true; render();
+  var fecha = getFecha(), hora = getHora();
+  enviar({ fecha:fecha, turno:S.turno, tipo:"Setup", maquina:S.setup.maquina,
+    responsable: S.empleado.numero + " - " + S.empleado.nombre,
+    noParte: S.setup.noParte, ordenTrabajo: S.setup.ot || "",
+    tipoOperacion: S.setup.operacion ? getTipoOp(S.setup.operacion) : "",
+    operacion: S.setup.operacion, piezas:"", horasSetup: S.setup.horas,
+    horasManto:"", tipoManto:"", descripcion:"" })
+  .then(function(){
+    S.history.unshift({ tipo:"Setup", fecha:fecha, hora:hora, turno:S.turno, maquina:S.setup.maquina });
+    S.submitted = { tipo:"Setup", fecha:fecha, hora:hora, turno:S.turno, maquina:S.setup.maquina,
+      noParte:S.setup.noParte, operacion:S.setup.operacion, horas:S.setup.horas, ot:S.setup.ot };
+    S.setup = { maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" };
+    S.sending = false; S.view = "done"; render();
   });
 }
 
-function sendManto(){
-  if(!S.manto.maquina||!S.manto.tipo) return;
-  S.sending=true; render();
-  var fecha=getFecha(), hora=getHora();
-  enviar({fecha:fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:S.empleado.numero+" - "+S.empleado.nombre,noParte:"",ordenTrabajo:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion}).then(function(){
-    S.history.unshift({tipo:"Mantenimiento",fecha:fecha,hora:hora,turno:S.turno,maquina:S.manto.maquina});
-    S.submitted={tipo:"Mantenimiento",fecha:fecha,hora:hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion,horas:S.manto.horas};
-    S.manto={maquina:"",tipo:"",descripcion:"",horas:""};
-    S.sending=false; S.view="done"; render();
+function sendManto() {
+  if (!S.manto.maquina || !S.manto.tipo) return;
+  S.sending = true; render();
+  var fecha = getFecha(), hora = getHora();
+  enviar({ fecha:fecha, turno:S.turno, tipo:"Mantenimiento", maquina:S.manto.maquina,
+    responsable: S.empleado.numero + " - " + S.empleado.nombre,
+    noParte:"", ordenTrabajo:"", tipoOperacion:"", operacion:"", piezas:"",
+    horasSetup:"", horasManto:S.manto.horas, tipoManto:S.manto.tipo, descripcion:S.manto.descripcion })
+  .then(function(){
+    S.history.unshift({ tipo:"Mantenimiento", fecha:fecha, hora:hora, turno:S.turno, maquina:S.manto.maquina });
+    S.submitted = { tipo:"Mantenimiento", fecha:fecha, hora:hora, turno:S.turno, maquina:S.manto.maquina,
+      tipoManto:S.manto.tipo, descripcion:S.manto.descripcion, horas:S.manto.horas };
+    S.manto = { maquina:"", tipo:"", descripcion:"", horas:"" };
+    S.sending = false; S.view = "done"; render();
   });
 }
 
-Promise.all([fetchCat("empleados"),fetchCat("operaciones"),fetchCat("partes"),fetchCat("tiposmanto")])
+Promise.all([fetchCat("empleados"), fetchCat("operaciones"), fetchCat("partes"), fetchCat("tiposmanto")])
   .then(function(results){
-    CAT={empleados:results[0],operaciones:results[1],partes:results[2],tiposmanto:results[3]};
-    S.view="login"; render();
-  }).catch(function(){
-    document.getElementById("app").innerHTML='<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catálogos. Verifica conexión.</div>';
+    CAT = { empleados:results[0], operaciones:results[1], partes:results[2], tiposmanto:results[3] };
+    S.view = "login"; render();
+  })
+  .catch(function(){
+    document.getElementById("app").innerHTML = '<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catalogos. Verifica conexion.</div>';
   });
 </script>
 </body>
