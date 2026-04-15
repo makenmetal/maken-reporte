@@ -199,8 +199,9 @@ function bindLogin(){
 }
 function doLogin(val){
   const str = String(val).trim();
-  if(str===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
-  const n=parseInt(str), emp=CAT.empleados.find(e=>e.numero===n);
+  if(str === OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
+  const n = parseInt(str);
+  const emp = CAT.empleados.find(e => parseInt(e.numero) === n);
   if(emp){ S.empleado=emp; S.loginError=false; S.view="main"; render(); }
   else{ S.loginError=true; render(); }
 }
