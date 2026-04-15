@@ -88,7 +88,8 @@ var S = {
   prod:  { maquina:"", partidas:[mkPartida()] },
   setup: { maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" },
   manto: { maquina:"", tipo:"", descripcion:"", horas:"" },
-  resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null }
+  resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
+  miturno:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null }
 };
 
 function mkPartida() {
@@ -166,7 +167,16 @@ function cargarResumen() {
     .catch(function(){ S.resumen.data = []; S.resumen.loading = false; render(); });
 }
 
-function setTab(t)    { S.tab = t; render(); }
+function cargarMiTurno() {
+  S.miturno.loading = true; render();
+  fetch(SHEETS_URL + "?action=miturno&fecha=" + encodeURIComponent(S.miturno.fecha) + "&turno=" + encodeURIComponent(S.miturno.turno) + "&empleado=" + encodeURIComponent(S.empleado.numero), {method:"GET",mode:"cors",redirect:"follow"})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ S.miturno.data = d; S.miturno.loading = false; render(); })
+    .catch(function(){ S.miturno.data = []; S.miturno.loading = false; render(); });
+}
+function setMiTurnoFecha(v){ S.miturno.fecha = v; }
+function setMiTurnoTurno(t){ S.miturno.turno = t; render(); }
+function buscarMiTurno(){ cargarMiTurno(); }
 function setTurno(t)  { S.turno = t; render(); }
 function setRTurno(t) { S.resumen.turno = t; render(); }
 function selManto(t)  { S.manto.tipo = t; render(); }
@@ -416,7 +426,52 @@ function bindDone() {
   document.getElementById("btnIni").addEventListener("click", doSalir);
 }
 
-function buildMaquinas(ns) {
+function buildMiTurno() {
+  var mt = S.miturno;
+  var rows = mt.data || [];
+  var totalPiezas = 0, totalSetup = 0, totalManto = 0;
+  rows.forEach(function(r){
+    totalPiezas += parseInt(r.piezas)     || 0;
+    totalSetup  += parseFloat(r.horasSetup) || 0;
+    totalManto  += parseFloat(r.horasManto) || 0;
+  });
+  var filas = rows.length === 0
+    ? '<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin registros para este turno</p>'
+    : rows.map(function(r){
+        var esProd  = r.tipo === "Producción";
+        var esSetup = r.tipo === "Setup";
+        var esManto = r.tipo === "Mantenimiento";
+        var color   = esProd ? "#1D9E75" : esSetup ? "#185FA5" : "#BA7517";
+        var valor   = esProd  ? (r.piezas || "—") + " pzs"
+                    : esSetup ? (r.horasSetup || "—") + " hrs"
+                    : (r.horasManto || "—") + " hrs";
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">'
+          + '<div>'
+          + '<span style="font-size:15px;font-weight:500">' + (r.maquina||"—") + '</span>'
+          + '<span style="font-size:12px;color:#888;margin-left:6px">' + (r.noParte||"") + '</span>'
+          + '<span style="font-size:12px;color:#888;margin-left:4px">' + (r.operacion||"") + '</span>'
+          + '</div>'
+          + '<div style="text-align:right">'
+          + '<span style="font-size:15px;font-weight:700;color:' + color + '">' + valor + '</span>'
+          + '<span style="display:block;font-size:11px;font-weight:600;color:' + color + ';background:' + color + '22;padding:1px 6px;border-radius:6px;margin-top:2px">' + r.tipo + '</span>'
+          + '</div></div>';
+      }).join("");
+
+  return '<div class="card" style="margin-bottom:16px">'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    + '<input type="text" id="mtFecha" value="' + mt.fecha + '" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
+    + '<button class="turno-btn' + (mt.turno==="1ro"?" active":"") + '" id="mt1">1ro</button>'
+    + '<button class="turno-btn' + (mt.turno==="3ro"?" active":"") + '" id="mt3">3ro</button>'
+    + '<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="mtBuscar">Buscar</button>'
+    + '</div></div>'
+    + (mt.loading ? '<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>' :
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
+      + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">PIEZAS</p><p style="font-size:24px;font-weight:700;color:#1D9E75">' + totalPiezas + '</p></div>'
+      + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:24px;font-weight:700;color:#185FA5">' + totalSetup.toFixed(1) + '</p></div>'
+      + '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:24px;font-weight:700;color:#BA7517">' + totalManto.toFixed(1) + '</p></div>'
+      + '</div>'
+      + '<div class="card">' + filas + '</div>');
+}
   var sel = ns==="prod" ? S.prod.maquina : ns==="setup" ? S.setup.maquina : S.manto.maquina;
   var html = "";
   AREAS.forEach(function(a){
@@ -564,9 +619,14 @@ function bindMain() {
   var t1 = document.getElementById("t1"); if (t1) t1.addEventListener("click", function(){ setTurno("1ro"); });
   var t3 = document.getElementById("t3"); if (t3) t3.addEventListener("click", function(){ setTurno("3ro"); });
   var bs = document.getElementById("btnSalir"); if (bs) bs.addEventListener("click", doSalir);
-  var tp = document.getElementById("tabP"); if (tp) tp.addEventListener("click", function(){ setTab("produccion"); });
-  var ts = document.getElementById("tabS"); if (ts) ts.addEventListener("click", function(){ setTab("setup"); });
-  var tm = document.getElementById("tabM"); if (tm) tm.addEventListener("click", function(){ setTab("manto"); });
+  var tp = document.getElementById("tabP");  if (tp) tp.addEventListener("click", function(){ setTab("produccion"); });
+  var ts = document.getElementById("tabS");  if (ts) ts.addEventListener("click", function(){ setTab("setup"); });
+  var tm = document.getElementById("tabM");  if (tm) tm.addEventListener("click", function(){ setTab("manto"); });
+  var tmt= document.getElementById("tabMT"); if (tmt) tmt.addEventListener("click", function(){ setTab("miturno"); });
+  var mt1 = document.getElementById("mt1"); if (mt1) mt1.addEventListener("click", function(){ setMiTurnoTurno("1ro"); });
+  var mt3 = document.getElementById("mt3"); if (mt3) mt3.addEventListener("click", function(){ setMiTurnoTurno("3ro"); });
+  var mtb = document.getElementById("mtBuscar"); if (mtb) mtb.addEventListener("click", function(){ var f=document.getElementById("mtFecha"); if(f) S.miturno.fecha=f.value; buscarMiTurno(); });
+  var mtf = document.getElementById("mtFecha"); if (mtf) mtf.addEventListener("change", function(e){ S.miturno.fecha=e.target.value; });
   var ap = document.getElementById("btnAddPartida"); if (ap) ap.addEventListener("click", addPartida);
   var sp = document.getElementById("sendProd");  if (sp) sp.addEventListener("click", sendProd);
   var ss = document.getElementById("sendSetup"); if (ss) ss.addEventListener("click", sendSetup);
