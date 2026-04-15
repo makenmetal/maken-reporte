@@ -222,7 +222,23 @@ function buildResumen(){
   });
   const mantoByMaq={};
   manto.forEach(row=>{ if(!mantoByMaq[row.maquina]) mantoByMaq[row.maquina]={horas:0,tipos:[]}; mantoByMaq[row.maquina].horas+=parseFloat(row.horasManto)||0; if(row.tipoManto&&!mantoByMaq[row.maquina].tipos.includes(row.tipoManto)) mantoByMaq[row.maquina].tipos.push(row.tipoManto); });
-  const allMaq=[...new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)])].sort();
+  const allMaquinas = AREAS.flatMap(a => a.maquinas);
+  const maquinasConActividad = new Set([...Object.keys(byMaq),...Object.keys(setupByMaq),...Object.keys(mantoByMaq)]);
+
+  const resumenMaquinas = `<div class="card" style="margin-bottom:16px">
+    <p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MÁQUINAS</p>
+    ${AREAS.map(a=>`
+      <p class="area-label" style="margin-top:8px">${a.area}</p>
+      ${a.maquinas.map(m=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">
+          <span style="font-size:15px;font-weight:500">${m}</span>
+          ${maquinasConActividad.has(m)
+            ? `<span style="font-size:12px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:3px 10px;border-radius:10px">Activa</span>`
+            : `<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>`
+          }
+        </div>`).join("")}
+    `).join("")}
+  </div>`;
   const totalPiezas=prod.reduce((a,r)=>a+(parseInt(r.piezas)||0),0);
   const totalSetup=setup.reduce((a,r)=>a+(parseFloat(r.horasSetup)||0),0);
   const totalManto=manto.reduce((a,r)=>a+(parseFloat(r.horasManto)||0),0);
@@ -269,6 +285,7 @@ function buildResumen(){
       <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS SETUP</p><p style="font-size:28px;font-weight:700;color:#185FA5">${totalSetup.toFixed(1)}</p></div>
       <div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">HRS MANTO</p><p style="font-size:28px;font-weight:700;color:#BA7517">${totalManto.toFixed(1)}</p></div>
     </div>
+    ${resumenMaquinas}
     ${detalle}`}
   </div>`;
 }
