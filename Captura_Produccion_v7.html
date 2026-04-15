@@ -638,9 +638,12 @@ function updateResults(ns, q) {
 }
 
 function sendProd() {
-  if (!S.prod.maquina || !S.prod.partidas[0].noParte) return;
+  if (!S.prod.maquina) { alert("Selecciona una maquina."); return; }
+  if (!S.prod.partidas[0].noParte) { alert("Selecciona al menos un numero de parte."); return; }
   for (var x = 0; x < S.prod.partidas.length; x++) {
-    if (!S.prod.partidas[x].ot) { alert("La orden de trabajo es obligatoria."); return; }
+    var pt = S.prod.partidas[x];
+    if (!pt.ot) { alert("La orden de trabajo es obligatoria en la partida " + (x+1) + "."); return; }
+    if (!pt.operacion) { alert("Selecciona una operacion en la partida " + (x+1) + "."); return; }
   }
   S.sending = true; render();
   var fecha = getFecha(), hora = getHora();
@@ -664,8 +667,10 @@ function sendProd() {
 }
 
 function sendSetup() {
-  if (!S.setup.maquina || !S.setup.noParte) return;
-  if (!S.setup.ot) { alert("La orden de trabajo es obligatoria."); return; }
+  if (!S.setup.maquina)    { alert("Selecciona una maquina."); return; }
+  if (!S.setup.noParte)    { alert("Selecciona un numero de parte."); return; }
+  if (!S.setup.ot)         { alert("La orden de trabajo es obligatoria."); return; }
+  if (!S.setup.operacion)  { alert("Selecciona una operacion."); return; }
   S.sending = true; render();
   var fecha = getFecha(), hora = getHora();
   enviar({
@@ -685,7 +690,8 @@ function sendSetup() {
 }
 
 function sendManto() {
-  if (!S.manto.maquina || !S.manto.tipo) return;
+  if (!S.manto.maquina) { alert("Selecciona una maquina."); return; }
+  if (!S.manto.tipo)    { alert("Selecciona un tipo de mantenimiento."); return; }
   S.sending = true; render();
   var fecha = getFecha(), hora = getHora();
   enviar({
