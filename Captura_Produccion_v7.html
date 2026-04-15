@@ -251,7 +251,7 @@ function bindLogin() {
 
 function buildResumen() {
   var r = S.resumen, rows = r.data || [];
-  var prod  = rows.filter(function(x){ return x.tipo === "Produccion" || x.tipo === "Produccion"; });
+  var prod  = rows.filter(function(x){ return x.tipo === "Produccion" || x.tipo === "Producción"; });
   var setup = rows.filter(function(x){ return x.tipo === "Setup"; });
   var manto = rows.filter(function(x){ return x.tipo === "Mantenimiento"; });
   var byMaq = {}, setupByMaq = {}, mantoByMaq = {};
@@ -368,7 +368,7 @@ function buildDone() {
   if (S.history.length) {
     histHTML = '<div style="margin-top:28px"><p style="font-size:14px;color:#888;margin-bottom:10px">Reportes del dia</p>';
     S.history.forEach(function(h){
-      var c = (h.tipo==="Produccion") ? "#1D9E75" : (h.tipo==="Setup") ? "#185FA5" : "#BA7517";
+      var c = (h.tipo==="Producción") ? "#1D9E75" : (h.tipo==="Setup") ? "#185FA5" : "#BA7517";
       histHTML += '<div class="history-item"><div>'
         + '<span style="font-size:15px;font-weight:500">' + h.maquina + '</span>'
         + '<span style="font-size:13px;color:#888;margin-left:8px">' + h.hora + '</span></div>'
@@ -377,7 +377,7 @@ function buildDone() {
     histHTML += '</div>';
   }
   var partidasHTML = "";
-  if (sub.tipo === "Produccion") {
+  if (sub.tipo === "Producción") {
     sub.partidas.forEach(function(p){
       partidasHTML += '<div style="border-top:1px solid #eee;padding-top:10px;margin-top:10px">'
         + '<div class="info-row"><span class="info-label">No. Parte</span><span class="info-val">' + p.noParte + '</span></div>'
@@ -650,7 +650,7 @@ function sendProd() {
   var promises = S.prod.partidas.filter(function(pt){ return pt.noParte; }).map(function(pt){
     var esOtro = pt.noParte === "Otro";
     return enviar({
-      fecha:fecha, turno:S.turno, tipo:"Produccion",
+      fecha:fecha, turno:S.turno, tipo:"Producción",
       maquina:S.prod.maquina, responsable:S.empleado.numero + " - " + S.empleado.nombre,
       noParte: esOtro ? "Otro - " + (pt.desc||"") : pt.noParte,
       ordenTrabajo:pt.ot||"", tipoOperacion:pt.operacion ? getTipoOp(pt.operacion) : "",
@@ -659,8 +659,8 @@ function sendProd() {
     });
   });
   Promise.all(promises).then(function(){
-    S.history.unshift({ tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina });
-    S.submitted = { tipo:"Produccion", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina, partidas:S.prod.partidas.slice() };
+    S.history.unshift({ tipo:"Producción", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina });
+    S.submitted = { tipo:"Producción", fecha:fecha, hora:hora, turno:S.turno, maquina:S.prod.maquina, partidas:S.prod.partidas.slice() };
     S.prod = { maquina:"", partidas:[mkPartida()] };
     S.sending = false; S.view = "done"; render();
   });
