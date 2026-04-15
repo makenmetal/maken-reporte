@@ -231,14 +231,23 @@ function buildResumen(){
     <p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MÁQUINAS</p>
     ${AREAS.map(a=>`
       <p class="area-label" style="margin-top:8px">${a.area}</p>
-      ${a.maquinas.map(m=>`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">
+      ${a.maquinas.map(m=>{
+        const tieneProd = byMaq[m]&&byMaq[m].length>0;
+        const tieneSetup = setupByMaq[m]&&setupByMaq[m].horas>0;
+        const tieneManto = mantoByMaq[m]&&mantoByMaq[m].horas>0;
+        const activa = tieneProd||tieneSetup||tieneManto;
+        const badges = [
+          tieneProd?`<span style="font-size:11px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:2px 8px;border-radius:8px">Prod</span>`:"",
+          tieneSetup?`<span style="font-size:11px;font-weight:600;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:8px">Setup</span>`:"",
+          tieneManto?`<span style="font-size:11px;font-weight:600;color:#BA7517;background:#FAEEDA;padding:2px 8px;border-radius:8px">Manto</span>`:"",
+        ].filter(Boolean).join(" ");
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3">
           <span style="font-size:15px;font-weight:500">${m}</span>
-          ${maquinasConActividad.has(m)
-            ? `<span style="font-size:12px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:3px 10px;border-radius:10px">Activa</span>`
-            : `<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>`
-          }
-        </div>`).join("")}
+          <div style="display:flex;gap:4px;align-items:center">
+            ${activa ? badges : `<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>`}
+          </div>
+        </div>`;
+      }).join("")}
     `).join("")}
   </div>`;
   const totalPiezas=prod.reduce((a,r)=>a+(parseInt(r.piezas)||0),0);
