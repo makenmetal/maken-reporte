@@ -82,7 +82,7 @@ let S = {
   resumen:{ fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
 };
 
-function mkPartida(){ return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", q:"" }; }
+function mkPartida(){ return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", desc:"", q:"" }; }
 
 function getTurno(){
   const t=new Date(), m=t.getHours()*60+t.getMinutes();
@@ -198,8 +198,9 @@ function bindLogin(){
   inp.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(inp.value); });
 }
 function doLogin(val){
-  if(String(val).trim()===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
-  const n=parseInt(val), emp=CAT.empleados.find(e=>e.numero===n);
+  const str = String(val).trim();
+  if(str===OWNER_PIN){ S.view="resumen"; cargarResumen(); render(); return; }
+  const n=parseInt(str), emp=CAT.empleados.find(e=>e.numero===n);
   if(emp){ S.empleado=emp; S.loginError=false; S.view="main"; render(); }
   else{ S.loginError=true; render(); }
 }
@@ -488,6 +489,7 @@ function bindMain(){
 
   on("[data-piezas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.piezas)].piezas=e.currentTarget.value; });
   on("[data-horas]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.horas)].horas=e.currentTarget.value; });
+  on("[data-desc]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.desc)].desc=e.currentTarget.value; });
   on("[data-ot]","input",e=>{ S.prod.partidas[parseInt(e.currentTarget.dataset.ot)].ot=e.currentTarget.value; });
   $("setupHoras")?.addEventListener("input",e=>S.setup.horas=e.currentTarget.value);
   $("setupOT")?.addEventListener("input",e=>S.setup.ot=e.currentTarget.value);
@@ -522,7 +524,7 @@ async function sendProd(){
   for(const pt of S.prod.partidas){
     if(!pt.noParte) continue;
     const esOtro=pt.noParte==="Otro";
-    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:pt.noParte,ordenTrabajo:pt.ot||"",tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
+    await enviar({fecha,turno:S.turno,tipo:"Producción",maquina:S.prod.maquina,responsable:`${S.empleado.numero} - ${S.empleado.nombre}`,noParte:esOtro?`Otro - ${pt.desc||""}`:pt.noParte,ordenTrabajo:pt.ot||"",tipoOperacion:pt.operacion?getTipoOp(pt.operacion):"",operacion:pt.operacion,piezas:esOtro?"":pt.piezas,horasSetup:esOtro?pt.horas:"",horasManto:"",tipoManto:"",descripcion:""});
   }
   S.history.unshift({tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina});
   S.submitted={tipo:"Producción",fecha,hora,turno:S.turno,maquina:S.prod.maquina,partidas:[...S.prod.partidas]};
