@@ -205,7 +205,7 @@ function addPartida(){S.prod.partidas.push(mkPartida());render();}
 function editarRegistro(idx){
   var r=S.miturno.data[idx];
   var ahora=new Date(),tsDate=new Date(r.timestamp);
-  if(r.timestamp&&((ahora-tsDate)/3600000>24)){alert("Solo puedes editar registros de las ultimas 24 horas.");return;}
+  if(r.timestamp&&((ahora-tsDate)/3600000>72)){alert("Solo puedes editar registros de los ultimos 3 dias.");return;}
   var ed={};
   for(var k in r)ed[k]=r[k];
   ed.idx=idx;
@@ -336,7 +336,7 @@ function buildMiTurno(){
       var color=esProd?"#1D9E75":esSetup?"#185FA5":"#BA7517";
       var valor=esProd?(r.piezas||"0")+" pzs":esSetup?(r.horasSetup||"0")+" hrs":(r.horasManto||"0")+" hrs";
       var ahora=new Date(),tsDate=r.timestamp?new Date(r.timestamp):null;
-      var puedeEditar=tsDate&&((ahora-tsDate)/3600000<=24);
+      var puedeEditar=tsDate&&((ahora-tsDate)/3600000<=72);
       return '<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<div><span style="font-size:15px;font-weight:500">'+(r.maquina||"—")+'</span>'
