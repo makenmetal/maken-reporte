@@ -84,7 +84,8 @@ var S = {
   setup: { maquina:"", noParte:"", operacion:"", horas:"", ot:"", q:"" },
   manto: { maquina:"", tipo:"", descripcion:"", horas:"" },
   resumen: { fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
-  miturno: { fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null }
+  miturno: { fecha:getFechaHoy(), turno:getTurno(), loading:false, data:null },
+  editando: null
 };
 
 function mkPartida() { return { noParte:"", operacion:"", piezas:"", horas:"", ot:"", desc:"", q:"" }; }
@@ -150,7 +151,39 @@ function cargarMiTurno() {
     .catch(function(){S.miturno.data=[];S.miturno.loading=false;render();});
 }
 
-function setTab(t) { S.tab=t; if(t==="miturno"&&!S.miturno.data) cargarMiTurno(); else render(); }
+function editarRegistro(idx) {
+  var r = S.miturno.data[idx];
+  var ahora = new Date();
+  var tsDate = new Date(r.timestamp);
+  var diffHrs = (ahora - tsDate) / 3600000;
+  if (diffHrs > 24) { alert("Solo puedes editar registros de las ultimas 24 horas."); return; }
+  S.editando = Object.assign({}, r, { idx: idx });
+  render();
+}
+function cancelarEdicion() { S.editando = null; render(); }
+function guardarEdicion() {
+  var ed = S.editando;
+  if (!ed.timestamp) { alert("No se puede identificar el registro."); return; }
+  S.sending = true; render();
+  var params = "action=actualizar&timestamp=" + encodeURIComponent(ed.timestamp)
+    + "&empleado=" + encodeURIComponent(S.empleado.numero)
+    + "&noParte=" + encodeURIComponent(ed.noParte||"")
+    + "&ordenTrabajo=" + encodeURIComponent(ed.ordenTrabajo||"")
+    + "&tipoOperacion=" + encodeURIComponent(ed.tipoOperacion||"")
+    + "&operacion=" + encodeURIComponent(ed.operacion||"")
+    + "&piezas=" + encodeURIComponent(ed.piezas||"")
+    + "&horasSetup=" + encodeURIComponent(ed.horasSetup||"")
+    + "&horasManto=" + encodeURIComponent(ed.horasManto||"")
+    + "&tipoManto=" + encodeURIComponent(ed.tipoManto||"")
+    + "&descripcion=" + encodeURIComponent(ed.descripcion||"");
+  fetch(SHEETS_URL + "?" + params, {method:"GET",mode:"cors",redirect:"follow"})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if (res.ok) { S.editando=null; S.miturno.data=null; S.sending=false; cargarMiTurno(); }
+      else { alert("Error al guardar: "+(res.error||"intenta de nuevo")); S.sending=false; render(); }
+    })
+    .catch(function(){ alert("Error de conexion."); S.sending=false; render(); });
+}
 function setTurno(t)  { S.turno=t; render(); }
 function setRTurno(t) { S.resumen.turno=t; render(); }
 function selManto(t)  { S.manto.tipo=t; render(); }
@@ -309,6 +342,39 @@ function bindResumen() {
 
 function buildMiTurno() {
   var mt=S.miturno, rows=mt.data||[];
+
+  // Vista de edicion
+  if (S.editando) {
+    var ed=S.editando;
+    var esProd=ed.tipo==="Producción"||ed.tipo==="Produccion";
+    var esSetup=ed.tipo==="Setup";
+    var esManto=ed.tipo==="Mantenimiento";
+    return '<div class="card" style="margin-bottom:16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+      +'<span style="font-weight:600;font-size:16px">Editando registro</span>'
+      +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnCancelarEd">Cancelar</button></div>'
+      +'<div style="font-size:13px;color:#888;margin-bottom:16px">'+ed.maquina+' - '+ed.tipo+'</div>'
+      +(esProd||esSetup?'<div class="field"><label>No. de parte</label>'
+        +'<input type="text" id="edNoParte" value="'+(ed.noParte||"")+'" placeholder="No. de parte"></div>'
+        +'<div class="field"><label>Orden de trabajo</label>'
+        +'<input type="tel" inputmode="numeric" class="ot-input" id="edOT" value="'+(ed.ordenTrabajo||"")+'" placeholder="550214"></div>'
+        +'<div class="field"><label>Operacion</label>'
+        +'<input type="text" id="edOperacion" value="'+(ed.operacion||"")+'" placeholder="Ej. 20a"></div>':"")
+      +(esProd?'<div class="field"><label>Piezas</label>'
+        +'<input type="number" inputmode="numeric" class="num-input" id="edPiezas" value="'+(ed.piezas||"0")+'" placeholder="0"></div>':"")
+      +(esSetup?'<div class="field"><label>Horas de setup</label>'
+        +'<input type="number" inputmode="decimal" class="num-input" id="edHorasSetup" value="'+(ed.horasSetup||"0")+'" placeholder="0.0" step="0.5"></div>':"")
+      +(esManto?'<div class="field"><label>Tipo de mantenimiento</label>'
+        +'<input type="text" id="edTipoManto" value="'+(ed.tipoManto||"")+'" placeholder="Tipo"></div>'
+        +'<div class="field"><label>Horas de mantenimiento</label>'
+        +'<input type="number" inputmode="decimal" class="num-input" id="edHorasManto" value="'+(ed.horasManto||"0")+'" placeholder="0.0" step="0.5"></div>'
+        +'<div class="field"><label>Descripcion</label>'
+        +'<textarea id="edDesc" placeholder="Descripcion">'+(ed.descripcion||"")+'</textarea></div>':"")
+      +'</div>'
+      +'<button class="send-btn" style="background:#1D9E75" id="btnGuardarEd"'+(S.sending?" disabled":"")+'>'
+      +(S.sending?"Guardando...":"Guardar cambios")+'</button>';
+  }
+
   var totalPiezas=0,totalSetup=0,totalManto=0;
   rows.forEach(function(r){
     totalPiezas+=parseInt(r.piezas)||0;
@@ -317,12 +383,15 @@ function buildMiTurno() {
   });
   var filas=rows.length===0
     ?'<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin registros para este turno</p>'
-    :rows.map(function(r){
+    :rows.map(function(r,idx){
       var esProd=r.tipo==="Produccion"||r.tipo==="Producción";
       var esSetup=r.tipo==="Setup";
       var color=esProd?"#1D9E75":esSetup?"#185FA5":"#BA7517";
       var valor=esProd?(r.piezas||"0")+" pzs":esSetup?(r.horasSetup||"0")+" hrs":(r.horasManto||"0")+" hrs";
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">'
+      var ahora=new Date(), tsDate=new Date(r.timestamp);
+      var puedeEditar=r.timestamp&&((ahora-tsDate)/3600000<=24);
+      return '<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<div><span style="font-size:15px;font-weight:500">'+(r.maquina||"—")+'</span>'
         +'<span style="font-size:12px;color:#888;margin-left:6px">'+(r.noParte||"")+'</span>'
         +(r.operacion?'<span style="font-size:12px;color:#aaa;margin-left:4px">'+r.operacion+'</span>':"")
@@ -330,7 +399,9 @@ function buildMiTurno() {
         +'<div style="text-align:right">'
         +'<span style="font-size:16px;font-weight:700;color:'+color+'">'+valor+'</span>'
         +'<span style="display:block;font-size:11px;font-weight:600;color:'+color+'">'+r.tipo+'</span>'
-        +'</div></div>';
+        +'</div></div>'
+        +(puedeEditar?'<button style="margin-top:6px;font-size:12px;color:#185FA5;background:none;border:1px solid #185FA5;border-radius:8px;padding:4px 12px;cursor:pointer" data-editidx="'+idx+'">Editar</button>':"")
+        +'</div>';
     }).join("");
 
   return '<div class="card" style="margin-bottom:16px">'
@@ -533,6 +604,23 @@ function bindMain() {
   var mt3=document.getElementById("mt3"); if(mt3)mt3.addEventListener("click",function(){S.miturno.turno="3ro";render();});
   var mtb=document.getElementById("mtBuscar"); if(mtb)mtb.addEventListener("click",function(){var f=document.getElementById("mtFecha");if(f)S.miturno.fecha=f.value;cargarMiTurno();});
   var mtf=document.getElementById("mtFecha"); if(mtf)mtf.addEventListener("change",function(e){S.miturno.fecha=e.target.value;});
+  document.querySelectorAll("[data-editidx]").forEach(function(el){
+    el.addEventListener("click",function(){editarRegistro(parseInt(el.dataset.editidx));});
+  });
+  var bce=document.getElementById("btnCancelarEd"); if(bce)bce.addEventListener("click",cancelarEdicion);
+  var bge=document.getElementById("btnGuardarEd");
+  if(bge)bge.addEventListener("click",function(){
+    var ed=S.editando;
+    var np=document.getElementById("edNoParte"); if(np)ed.noParte=np.value;
+    var ot=document.getElementById("edOT"); if(ot)ed.ordenTrabajo=ot.value;
+    var op=document.getElementById("edOperacion"); if(op)ed.operacion=op.value;
+    var pz=document.getElementById("edPiezas"); if(pz)ed.piezas=pz.value;
+    var hs=document.getElementById("edHorasSetup"); if(hs)ed.horasSetup=hs.value;
+    var hm=document.getElementById("edHorasManto"); if(hm)ed.horasManto=hm.value;
+    var tm=document.getElementById("edTipoManto"); if(tm)ed.tipoManto=tm.value;
+    var ds=document.getElementById("edDesc"); if(ds)ed.descripcion=ds.value;
+    guardarEdicion();
+  });
   document.querySelectorAll("[data-maq]").forEach(function(el){el.addEventListener("click",function(){setMaq(el.dataset.ns,el.dataset.maq);});});
   document.querySelectorAll("[data-op]").forEach(function(el){el.addEventListener("click",function(){setOp(el.dataset.ns,el.dataset.op);});});
   document.querySelectorAll("[data-manto]").forEach(function(el){el.addEventListener("click",function(){selManto(el.dataset.manto);});});
