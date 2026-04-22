@@ -1081,8 +1081,8 @@ function buildSolLista(){
   var existe=subTabs.some(function(t){return t.id===sub;});
   if(!existe){sub=subTabs[0].id;S.sol.subTab=sub;}
 
-  var subTabsHtml='<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px">'+subTabs.map(function(t){
-    return'<button data-soltab="'+t.id+'" style="padding:6px 12px;border-radius:14px;border:1px solid '+(sub===t.id?"#1D9E75":"#ddd")+';background:'+(sub===t.id?"#1D9E75":"transparent")+';color:'+(sub===t.id?"#fff":"#666")+';font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap">'+t.label+'</button>';
+  var subTabsHtml='<div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:6px">'+subTabs.map(function(t){
+    return'<button data-soltab="'+t.id+'" style="padding:12px 18px;border-radius:20px;border:1px solid '+(sub===t.id?"#1D9E75":"#ccc")+';background:'+(sub===t.id?"#1D9E75":"#fff")+';color:'+(sub===t.id?"#fff":"#333")+';font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;min-height:44px">'+t.label+'</button>';
   }).join("")+'</div>';
 
   // Botón nueva solicitud (solo si puede solicitar o es manto)
