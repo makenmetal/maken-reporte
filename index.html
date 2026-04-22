@@ -11,19 +11,22 @@
 body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
 .wrap { max-width: 480px; margin: 0 auto; padding: 1rem 1.25rem 3rem; }
 label { font-size: 14px; color: #666; margin-bottom: 6px; display: block; font-weight: 500; }
-input, textarea { width: 100%; padding: 12px 14px; font-size: 17px; border-radius: 12px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; font-family: inherit; }
-input:focus, textarea:focus { outline: 2px solid #1D9E75; border-color: #1D9E75; }
+input, textarea, select { width: 100%; padding: 12px 14px; font-size: 17px; border-radius: 12px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; font-family: inherit; }
+input:focus, textarea:focus, select:focus { outline: 2px solid #1D9E75; border-color: #1D9E75; }
 .section { margin-bottom: 24px; }
 .card { background: #fff; border-radius: 16px; border: 1px solid #e8e8e8; padding: 1.25rem; margin-bottom: 16px; }
 .area-label { font-size: 13px; color: #888; margin-bottom: 6px; margin-top: 12px; }
 .btn-grid { display: grid; gap: 8px; }
 .big-btn { min-height: 56px; border-radius: 12px; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1a1a1a; padding: 8px 12px; text-align: center; width: 100%; user-select: none; }
 .big-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; }
+.big-btn.urgente { border-color: #E24B4A; color: #E24B4A; }
+.big-btn.urgente.active { background: #E24B4A; color: #fff; }
 .send-btn { width: 100%; padding: 16px 0; border: none; border-radius: 14px; font-weight: 600; font-size: 18px; cursor: pointer; margin-top: 8px; color: #fff; }
 .send-btn:disabled { opacity: 0.5; }
 .tab-bar { display: flex; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; overflow-x: auto; }
-.tab-btn { flex: 1; min-width: 70px; padding: 12px 4px; font-size: 13px; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: transparent; color: #888; user-select: none; white-space: nowrap; }
+.tab-btn { flex: 1; min-width: 70px; padding: 12px 4px; font-size: 13px; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: transparent; color: #888; user-select: none; white-space: nowrap; position: relative; }
 .tab-btn.active { font-weight: 600; border-bottom-color: #1D9E75; color: #1D9E75; }
+.tab-badge { position: absolute; top: 6px; right: 4px; background: #E24B4A; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 8px; min-width: 16px; }
 .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
 .turno-btn { padding: 4px 14px; border-radius: 20px; border: 1px solid #ddd; background: transparent; color: #888; font-size: 13px; cursor: pointer; user-select: none; }
 .turno-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; font-weight: 600; }
@@ -50,15 +53,39 @@ textarea { resize: vertical; min-height: 90px; font-size: 16px; }
 .selected-parte { font-size: 18px; font-weight: 600; color: #1D9E75; margin: 8px 0 4px; padding: 10px 14px; background: #E1F5EE; border-radius: 10px; }
 .edit-btn { margin-top: 6px; margin-right: 6px; font-size: 12px; color: #185FA5; background: none; border: 1px solid #185FA5; border-radius: 8px; padding: 4px 12px; cursor: pointer; }
 .borrar-btn { margin-top: 6px; font-size: 12px; color: #E24B4A; background: none; border: 1px solid #E24B4A; border-radius: 8px; padding: 4px 12px; cursor: pointer; }
-.send-btn-danger { width: 100%; padding: 14px 0; border: 1px solid #E24B4A; border-radius: 14px; font-weight: 600; font-size: 16px; cursor: pointer; margin-top: 8px; color: #E24B4A; background: transparent; }
+.refresh-btn { background: transparent; border: 1px solid #ddd; border-radius: 10px; padding: 8px 12px; font-size: 14px; color: #666; cursor: pointer; }
+.sol-card { border-left: 4px solid #ccc; padding-left: 12px; margin-bottom: 10px; }
+.sol-card.urgente { border-left-color: #E24B4A; }
+.sol-card.normal { border-left-color: #185FA5; }
+.sol-card.cerrada { border-left-color: #888; opacity: 0.7; }
+.estado-pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+.estado-abierta { background: #FAEEDA; color: #BA7517; }
+.estado-proceso { background: #E6F1FB; color: #185FA5; }
+.estado-cierre { background: #F3E8FF; color: #7C3AED; }
+.estado-aceptada { background: #E1F5EE; color: #1D9E75; }
+.estado-descartada { background: #f0f0f0; color: #888; }
+.estado-rechazada { background: #FBE5E5; color: #E24B4A; }
+.sol-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.sol-id { font-size: 12px; font-weight: 700; color: #888; letter-spacing: 0.5px; }
+.avance-item { background: #f9f9f7; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 14px; }
+.avance-header { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px; }
+.btn-accept { background: #1D9E75; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-reject { background: transparent; color: #E24B4A; border: 1px solid #E24B4A; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-discard { background: transparent; color: #888; border: 1px solid #bbb; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.checkbox-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.checkbox-row input[type=checkbox] { width: 20px; height: 20px; }
+.sub-cat-box { background: #FBE5E5; border-radius: 10px; padding: 12px; margin-top: 8px; }
+.sub-cat-box label { color: #9C2828; font-weight: 600; }
 </style>
 </head>
 <body>
 <div id="app" class="wrap"><div class="spinner">Cargando catalogos...</div></div>
 <script>
 var SHEETS_URL = "https://script.google.com/a/macros/makenmetal.com.mx/s/AKfycbwBZ4Td2cjH3CbrESY8PVBIop3mcbOtVQrwqN51pjMCKp47YEs4og2uOd-s3ZQ-kLUwUg/exec";
+// *** PEGAR aquí la URL de deployment del Apps Script de MANTO (Sheet separado) ***
+var SHEETS_MANTO_URL = "https://script.google.com/macros/s/AKfycbz0YmVWtmUTNOMspYX0FkqmID38dCeBR4fKR9MAErWUdPaxtRTywn5jmrzaWoQearwT/exec";
 var OWNER_PIN = "9473";
-var AREAS = [
+var AREAS_FALLBACK = [
   {area:"Torno",maquinas:["Puma 1","Puma 2","Haas 1","Haas 2"]},
   {area:"Centro de Maquinado",maquinas:["Doosan 2","Doosan 3"]},
   {area:"Corte",maquinas:["Amada"]},
@@ -79,15 +106,52 @@ var OPS_POR_AREA = {
   "soldadura":["800a","800b","800c","800d"],"detallado":["900a","900b","900c","900d"]
 };
 var CAT = null;
+
+// AREAS se arma dinámicamente desde CAT.maquinas (filtrado por tipo)
+function areasPrincipales(){
+  if(!CAT||!CAT.maquinas||!CAT.maquinas.length)return AREAS_FALLBACK;
+  var grp={},orden=[];
+  CAT.maquinas.forEach(function(m){
+    if(m.tipo&&m.tipo.toLowerCase()!=="principal")return;
+    if(!grp[m.area]){grp[m.area]=[];orden.push(m.area);}
+    grp[m.area].push(m.maquina);
+  });
+  return orden.map(function(a){return{area:a,maquinas:grp[a]};});
+}
+function areasTodas(){
+  if(!CAT||!CAT.maquinas||!CAT.maquinas.length)return AREAS_FALLBACK;
+  var grp={},orden=[];
+  CAT.maquinas.forEach(function(m){
+    if(!grp[m.area]){grp[m.area]=[];orden.push(m.area);}
+    grp[m.area].push(m.maquina);
+  });
+  return orden.map(function(a){return{area:a,maquinas:grp[a]};});
+}
+
 var S = {
-  view:"loading",empleado:null,loginError:false,
+  view:"loading",empleado:null,loginError:false,esDueno:false,
   turno:getTurno(),fechaManual:null,tab:"produccion",sending:false,
   history:[],submitted:null,editando:null,
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
-  manto:{maquina:"",tipo:"",descripcion:"",horas:""},
+  manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
   resumen:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
-  miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null}
+  miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
+  // Solicitudes
+  sol:{
+    subTab:"mias", // mias | por_aceptar | cola_manto | todas
+    loading:false,data:null,filtro:"activas",
+    // crear
+    crear:{maquina:"",prioridad:"",maquinaParada:"",descripcion:"",showing:false},
+    // detalle/avance
+    viendo:null, // id
+    detalleLoading:false,detalle:null,
+    avance:{horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false},
+    descartar:{showing:false,motivo:""},
+    rechazar:{showing:false,motivo:""}
+  },
+  // Panel dueño - ver reportes operador
+  verOp:{empleadoSel:"",fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null}
 };
 
 function mkPartida(){return{noParte:"",operacion:"",piezas:"",horas:"",ot:"",desc:"",q:""};}
@@ -107,7 +171,7 @@ function getHora(){return new Date().toLocaleTimeString("es-MX",{hour:"2-digit",
 
 function parsearTimestamp(ts){
   if(!ts||ts==="")return null;
-  var partes=ts.split(" ");
+  var partes=String(ts).split(" ");
   if(partes.length<2)return null;
   var fecha=partes[0].split("/");
   var hora=partes[1].split(":");
@@ -117,6 +181,26 @@ function parsearTimestamp(ts){
 
 function getMaqArea(m){
   if(!m)return"";
+  // Primero intenta del catálogo
+  if(CAT&&CAT.maquinas){
+    for(var i=0;i<CAT.maquinas.length;i++){
+      if(CAT.maquinas[i].maquina===m){
+        var a=(CAT.maquinas[i].area||"").toLowerCase();
+        if(a.indexOf("roscado")>=0)return"roscado";
+        if(a.indexOf("centro")>=0)return"centro_maquinado";
+        if(a.indexOf("torno")>=0)return"torno";
+        if(a.indexOf("interior")>=0)return"rect_interior";
+        if(a.indexOf("exterior")>=0)return"rect_exterior";
+        if(a.indexOf("avellan")>=0)return"avellanado";
+        if(a.indexOf("corte")>=0)return"corte";
+        if(a.indexOf("ensamble")>=0)return"ensamble";
+        if(a.indexOf("soldadura")>=0)return"soldadura";
+        if(a.indexOf("detallado")>=0)return"detallado";
+        return"otro";
+      }
+    }
+  }
+  // Fallback: por nombre
   var s=m.toLowerCase();
   if(s.indexOf("machueleadora")>=0)return"roscado";
   if(s.indexOf("doosan")>=0)return"centro_maquinado";
@@ -149,23 +233,84 @@ function getOps(noParte,maq){
   return Object.keys(CAT.partes[noParte]).filter(function(op){return!(op==="500a"&&area==="centro_maquinado");});
 }
 function getOpsParaMaquina(maq){return OPS_POR_AREA[getMaqArea(maq)]||["20a","20b","20c","20d"];}
-function tiposManto(){return(CAT&&CAT.tiposmanto&&CAT.tiposmanto.length)?CAT.tiposmanto:TIPOS_MANTO_DEFAULT;}
+function tiposMantoPrincipales(){
+  if(CAT&&CAT.tiposmanto){
+    if(CAT.tiposmanto.principales)return CAT.tiposmanto.principales;
+    if(Array.isArray(CAT.tiposmanto)&&CAT.tiposmanto.length)return CAT.tiposmanto;
+  }
+  return TIPOS_MANTO_DEFAULT;
+}
+function tiposMantoSub(padre){
+  if(CAT&&CAT.tiposmanto&&CAT.tiposmanto.sub&&CAT.tiposmanto.sub[padre])return CAT.tiposmanto.sub[padre];
+  return[];
+}
 
 function fetchCat(a){return fetch(SHEETS_URL+"?action="+a,{method:"GET",mode:"cors",redirect:"follow"}).then(function(r){return r.json();});}
 function enviar(data){return fetch(SHEETS_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});}
+function apiGet(params){
+  var qs=Object.keys(params).map(function(k){return k+"="+encodeURIComponent(params[k]);}).join("&");
+  return fetch(SHEETS_URL+"?"+qs,{method:"GET",mode:"cors",redirect:"follow"}).then(function(r){return r.json();});
+}
+function apiGetManto(params){
+  if(!SHEETS_MANTO_URL||SHEETS_MANTO_URL.indexOf("PEGAR")>=0){
+    return Promise.reject(new Error("SHEETS_MANTO_URL no configurado en reporte.html"));
+  }
+  var qs=Object.keys(params).map(function(k){return k+"="+encodeURIComponent(params[k]);}).join("&");
+  return fetch(SHEETS_MANTO_URL+"?"+qs,{method:"GET",mode:"cors",redirect:"follow"}).then(function(r){return r.json();});
+}
+function fetchCatManto(a){
+  if(!SHEETS_MANTO_URL||SHEETS_MANTO_URL.indexOf("PEGAR")>=0){
+    return Promise.resolve(null);
+  }
+  return fetch(SHEETS_MANTO_URL+"?action="+a,{method:"GET",mode:"cors",redirect:"follow"}).then(function(r){return r.json();});
+}
+
+
+// ============================================================
+// CARGAS DE DATOS
+// ============================================================
 
 function cargarResumen(){
   S.resumen.loading=true;render();
-  fetch(SHEETS_URL+"?action=reportes&fecha="+encodeURIComponent(S.resumen.fecha)+"&turno="+encodeURIComponent(S.resumen.turno),{method:"GET",mode:"cors",redirect:"follow"})
-    .then(function(r){return r.json();}).then(function(d){S.resumen.data=d;S.resumen.loading=false;render();})
+  apiGet({action:"reportes",fecha:S.resumen.fecha,turno:S.resumen.turno})
+    .then(function(d){S.resumen.data=d;S.resumen.loading=false;render();})
     .catch(function(){S.resumen.data=[];S.resumen.loading=false;render();});
 }
 function cargarMiTurno(){
   S.miturno.loading=true;render();
-  fetch(SHEETS_URL+"?action=miturno&fecha="+encodeURIComponent(S.miturno.fecha)+"&turno="+encodeURIComponent(S.miturno.turno)+"&empleado="+encodeURIComponent(S.empleado.numero),{method:"GET",mode:"cors",redirect:"follow"})
-    .then(function(r){return r.json();}).then(function(d){S.miturno.data=d;S.miturno.loading=false;render();})
+  apiGet({action:"miturno",fecha:S.miturno.fecha,turno:S.miturno.turno,empleado:S.empleado.numero})
+    .then(function(d){S.miturno.data=d;S.miturno.loading=false;render();})
     .catch(function(){S.miturno.data=[];S.miturno.loading=false;render();});
 }
+function cargarSolicitudes(){
+  S.sol.loading=true;render();
+  var filtro=S.sol.subTab==="cerradas"?"cerradas":"activas";
+  var params={action:"listSolicitudes",filtro:filtro};
+  if(S.sol.subTab==="mias"){params.filtro="del_usuario";params.empleado=S.empleado.numero;}
+  apiGetManto(params)
+    .then(function(d){S.sol.data=d||[];S.sol.loading=false;render();})
+    .catch(function(){S.sol.data=[];S.sol.loading=false;render();});
+}
+function cargarDetalleSolicitud(id){
+  S.sol.viendo=id;S.sol.detalleLoading=true;S.sol.detalle=null;render();
+  apiGetManto({action:"solicitudDetalle",id:id})
+    .then(function(d){
+      if(d.ok){S.sol.detalle=d;}
+      S.sol.detalleLoading=false;render();
+    }).catch(function(){S.sol.detalleLoading=false;render();});
+}
+function cargarVerOperador(){
+  if(!S.verOp.empleadoSel){alert("Selecciona un empleado.");return;}
+  S.verOp.loading=true;render();
+  apiGet({action:"registrosOperador",fecha:S.verOp.fecha,turno:S.verOp.turno,empleado:S.verOp.empleadoSel})
+    .then(function(d){S.verOp.data=d||[];S.verOp.loading=false;render();})
+    .catch(function(){S.verOp.data=[];S.verOp.loading=false;render();});
+}
+
+// ============================================================
+// EDICION / BORRADO (ya existente, adaptado para dueño)
+// ============================================================
+
 function guardarEdicion(){
   var ed=S.editando;
   if(!ed||!ed.timestamp){alert("No se puede identificar el registro.");return;}
@@ -178,66 +323,222 @@ function guardarEdicion(){
   if(esManto&&!ed.tipoManto){alert("Selecciona un tipo de mantenimiento.");return;}
   S.sending=true;render();
   var tipoOpCalc=ed.operacion?getTipoOp(ed.operacion):"";
-  var params="action=actualizar"
-    +"&timestamp="+encodeURIComponent(ed.timestamp)
-    +"&empleado="+encodeURIComponent(S.empleado.numero)
-    +"&maquina="+encodeURIComponent(ed.maquina||"")
-    +"&noParte="+encodeURIComponent(ed.noParte||"")
-    +"&ordenTrabajo="+encodeURIComponent(ed.ordenTrabajo||"")
-    +"&tipoOperacion="+encodeURIComponent(tipoOpCalc)
-    +"&operacion="+encodeURIComponent(ed.operacion||"")
-    +"&piezas="+encodeURIComponent(ed.piezas||"")
-    +"&horasSetup="+encodeURIComponent(ed.horasSetup||"")
-    +"&horasManto="+encodeURIComponent(ed.horasManto||"")
-    +"&tipoManto="+encodeURIComponent(ed.tipoManto||"")
-    +"&descripcion="+encodeURIComponent(ed.descripcion||"");
-  fetch(SHEETS_URL+"?"+params,{method:"GET",mode:"cors",redirect:"follow"})
-    .then(function(r){return r.json();})
-    .then(function(res){
-      if(res.ok){S.editando=null;S.miturno.data=null;S.sending=false;cargarMiTurno();}
-      else{alert("Error: "+(res.error||"intenta de nuevo"));S.sending=false;render();}
-    }).catch(function(){alert("Error de conexion.");S.sending=false;render();});
+  var params={
+    action:"actualizar",
+    timestamp:ed.timestamp,
+    empleado:S.empleado.numero,
+    dueno:S.esDueno?"1":"0",
+    maquina:ed.maquina||"",
+    noParte:ed.noParte||"",
+    ordenTrabajo:ed.ordenTrabajo||"",
+    tipoOperacion:tipoOpCalc,
+    operacion:ed.operacion||"",
+    piezas:ed.piezas||"",
+    horasSetup:ed.horasSetup||"",
+    horasManto:ed.horasManto||"",
+    tipoManto:ed.tipoManto||"",
+    descripcion:ed.descripcion||""
+  };
+  apiGet(params).then(function(res){
+    if(res.ok){
+      S.editando=null;S.sending=false;
+      if(S.esDueno){S.verOp.data=null;cargarVerOperador();}
+      else{S.miturno.data=null;cargarMiTurno();}
+    } else{alert("Error: "+(res.error||"intenta de nuevo"));S.sending=false;render();}
+  }).catch(function(){alert("Error de conexion.");S.sending=false;render();});
 }
-function borrarRegistro(idx){
-  var r=S.miturno.data[idx];
+function borrarRegistro(lista,idx){
+  var r=lista[idx];
   if(!r||!r.timestamp){alert("No se puede identificar el registro.");return;}
-  var tsDate=parsearTimestamp(r.timestamp);
-  var ahora=new Date();
-  if(tsDate&&((ahora-tsDate)/3600000>72)){alert("Solo puedes borrar registros de los ultimos 3 dias.");return;}
+  if(!S.esDueno){
+    var tsDate=parsearTimestamp(r.timestamp),ahora=new Date();
+    if(tsDate&&((ahora-tsDate)/3600000>72)){alert("Solo puedes borrar registros de los ultimos 3 dias.");return;}
+  }
   var resumen=r.tipo+" - "+r.maquina+(r.noParte?" ("+r.noParte+")":"");
   if(!confirm("Borrar este registro?\n\n"+resumen+"\n\nEsta accion no se puede deshacer.")){return;}
   S.sending=true;render();
-  var params="action=borrar"
-    +"&timestamp="+encodeURIComponent(r.timestamp)
-    +"&empleado="+encodeURIComponent(S.empleado.numero);
-  fetch(SHEETS_URL+"?"+params,{method:"GET",mode:"cors",redirect:"follow"})
-    .then(function(r2){return r2.json();})
+  apiGet({action:"borrar",timestamp:r.timestamp,empleado:S.empleado.numero,dueno:S.esDueno?"1":"0"})
     .then(function(res){
-      if(res.ok){S.miturno.data=null;S.sending=false;cargarMiTurno();}
-      else{alert("Error: "+(res.error||"intenta de nuevo"));S.sending=false;render();}
+      if(res.ok){
+        S.sending=false;
+        if(S.esDueno){S.verOp.data=null;cargarVerOperador();}
+        else{S.miturno.data=null;cargarMiTurno();}
+      } else{alert("Error: "+(res.error||"intenta de nuevo"));S.sending=false;render();}
     }).catch(function(){alert("Error de conexion.");S.sending=false;render();});
 }
+function editarRegistro(lista,idx){
+  var r=lista[idx];
+  if(!S.esDueno){
+    var tsDate=parsearTimestamp(r.timestamp),ahora=new Date();
+    if(r.timestamp&&tsDate&&((ahora-tsDate)/3600000>72)){alert("Solo puedes editar registros de los ultimos 3 dias.");return;}
+  }
+  var ed={};for(var k in r)ed[k]=r[k];ed.idx=idx;
+  var np=String(ed.noParte||"");
+  ed.q=np.indexOf("Otro")===0?"Otro":np;
+  S.editando=ed;render();
+}
+
+// ============================================================
+// SOLICITUDES - ACCIONES
+// ============================================================
+
+function sendCrearSolicitud(){
+  var c=S.sol.crear;
+  if(!c.maquina){alert("Selecciona una maquina.");return;}
+  if(!c.prioridad){alert("Selecciona prioridad.");return;}
+  if(c.prioridad==="Urgente"&&!c.maquinaParada){alert("Indica si la maquina esta parada.");return;}
+  if(!c.descripcion||c.descripcion.trim().length<5){alert("Describe la falla con mas detalle.");return;}
+  S.sending=true;render();
+  apiGetManto({
+    action:"crearSolicitud",
+    maquina:c.maquina,
+    solicitante:S.empleado.numero+" - "+S.empleado.nombre,
+    prioridad:c.prioridad,
+    maquinaParada:c.prioridad==="Urgente"?c.maquinaParada:"",
+    descripcion:c.descripcion
+  }).then(function(res){
+    S.sending=false;
+    if(res.ok){
+      alert("Solicitud creada: "+res.id);
+      S.sol.crear={maquina:"",prioridad:"",maquinaParada:"",descripcion:"",showing:false};
+      cargarSolicitudes();
+    }else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+  }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+function sendCrearAvance(){
+  var a=S.sol.avance,id=S.sol.viendo;
+  if(!a.tipo){alert("Selecciona clasificacion.");return;}
+  if(a.tipo==="Emergencia"&&!a.subtipo){alert("Selecciona subcategoria de Emergencia.");return;}
+  if(!a.actividades||a.actividades.trim().length<5){alert("Describe las actividades realizadas.");return;}
+  if(!a.horas||parseFloat(a.horas)<=0){alert("Indica horas invertidas.");return;}
+  var clasFinal=a.tipo==="Emergencia"?("Emergencia - "+a.subtipo):a.tipo;
+  S.sending=true;render();
+  apiGetManto({
+    action:"crearAvance",
+    idSolicitud:id,
+    tecnico:S.empleado.numero+" - "+S.empleado.nombre,
+    horas:a.horas,
+    clasificacion:clasFinal,
+    actividades:a.actividades,
+    esCierre:a.esCierre?"1":"0"
+  }).then(function(res){
+    S.sending=false;
+    if(res.ok){
+      S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};
+      cargarDetalleSolicitud(id);
+    }else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+  }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+function sendAceptarSolicitud(){
+  var id=S.sol.viendo;
+  if(!confirm("Aceptar el cierre de "+id+"?\n\nEsto cierra la solicitud oficialmente."))return;
+  S.sending=true;render();
+  apiGetManto({
+    action:"aceptarSolicitud",
+    idSolicitud:id,
+    aceptadoPor:S.empleado.numero+" - "+S.empleado.nombre
+  }).then(function(res){
+    S.sending=false;
+    if(res.ok){cargarDetalleSolicitud(id);}
+    else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+  }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+function sendRechazarSolicitud(){
+  var id=S.sol.viendo,motivo=S.sol.rechazar.motivo;
+  if(!motivo||motivo.trim().length<5){alert("Describe el motivo del rechazo.");return;}
+  S.sending=true;render();
+  apiGetManto({action:"rechazarSolicitud",idSolicitud:id,motivo:motivo})
+    .then(function(res){
+      S.sending=false;
+      if(res.ok){
+        S.sol.rechazar={showing:false,motivo:""};
+        cargarDetalleSolicitud(id);
+      }else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+    }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+function sendDescartarSolicitud(){
+  var id=S.sol.viendo,motivo=S.sol.descartar.motivo;
+  if(!motivo||motivo.trim().length<5){alert("Describe el motivo del descarte.");return;}
+  if(!confirm("Descartar "+id+"?\nSe cerrara sin acumular tiempo."))return;
+  S.sending=true;render();
+  apiGetManto({
+    action:"descartarSolicitud",
+    idSolicitud:id,
+    tecnico:S.empleado.numero+" - "+S.empleado.nombre,
+    motivo:motivo
+  }).then(function(res){
+    S.sending=false;
+    if(res.ok){
+      S.sol.descartar={showing:false,motivo:""};
+      cargarDetalleSolicitud(id);
+    }else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+  }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+function sendForzarCierre(){
+  var id=S.sol.viendo;
+  if(!confirm("Forzar cierre como DUEÑO de "+id+"?"))return;
+  S.sending=true;render();
+  apiGetManto({action:"forzarCierre",idSolicitud:id})
+    .then(function(res){
+      S.sending=false;
+      if(res.ok){cargarDetalleSolicitud(id);}
+      else{alert("Error: "+(res.error||""));render();}
+    }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+
+// ============================================================
+// LOGIN Y NAVEGACION
+// ============================================================
 
 function doLogin(val){
   var str=String(val).trim();
-  if(str===OWNER_PIN){S.view="resumen";cargarResumen();render();return;}
+  if(str===OWNER_PIN){
+    S.esDueno=true;
+    S.empleado={numero:"9473",nombre:"Dueño",puedeSolicitar:true,puedeAceptar:true,esManto:true};
+    S.view="resumen";cargarResumen();render();return;
+  }
   var n=parseInt(str),emp=null;
-  for(var i=0;i<CAT.empleados.length;i++){if(parseInt(CAT.empleados[i].numero)===n){emp=CAT.empleados[i];break;}}
-  if(emp){S.empleado=emp;S.loginError=false;S.view="main";render();}
-  else{S.loginError=true;render();}
+  for(var i=0;i<CAT.empleados.length;i++){
+    if(parseInt(CAT.empleados[i].numero)===n){emp=CAT.empleados[i];break;}
+  }
+  if(emp){
+    S.empleado=emp;S.esDueno=false;S.loginError=false;
+    // Tab inicial según rol
+    if(emp.esManto){S.tab="solicitudes";S.sol.subTab="cola_manto";cargarSolicitudes();}
+    else{S.tab="produccion";}
+    S.view="main";render();
+  }else{S.loginError=true;render();}
 }
-function doSalir(){S.empleado=null;S.view="login";render();}
+function doSalir(){S.empleado=null;S.esDueno=false;S.view="login";render();}
 function doNuevo(){S.submitted=null;S.view="main";render();}
-function doSalirResumen(){S.view="login";render();}
-function doBuscarResumen(){var inp=document.getElementById("resumenFecha");if(inp)S.resumen.fecha=inp.value;cargarResumen();}
+function doSalirResumen(){S.empleado=null;S.esDueno=false;S.view="login";render();}
+
 function setTurno(t){S.turno=t;render();}
 function setRTurno(t){S.resumen.turno=t;render();}
-function setTab(t){S.tab=t;if(t==="miturno"&&!S.miturno.data)cargarMiTurno();else render();}
+function setTab(t){
+  S.tab=t;
+  if(t==="miturno"&&!S.miturno.data)cargarMiTurno();
+  else if(t==="solicitudes"){
+    // Seleccionar subTab por defecto según rol
+    if(!S.sol.subTab||S.sol.subTab==="cerradas"){
+      if(S.empleado&&S.empleado.esManto)S.sol.subTab="cola_manto";
+      else if(S.empleado&&S.empleado.puedeAceptar)S.sol.subTab="por_aceptar";
+      else S.sol.subTab="mias";
+    }
+    cargarSolicitudes();
+  }
+  else render();
+}
+function setSolTab(t){
+  S.sol.subTab=t;S.sol.viendo=null;S.sol.detalle=null;
+  cargarSolicitudes();
+}
 function setMaq(ns,maq){
-  if(ns==="prod")S.prod.maquina=maq;
-  else if(ns==="setup")S.setup.maquina=maq;
-  else if(ns==="manto")S.manto.maquina=maq;
+  if(ns==="prod"){S.prod.maquina=maq;}
+  else if(ns==="setup"){S.setup.maquina=maq;}
+  else if(ns==="manto"){S.manto.maquina=maq;}
   else if(ns==="edit"){S.editando.maquina=maq;S.editando.operacion="";}
+  else if(ns==="solcrear"){S.sol.crear.maquina=maq;}
   render();
 }
 function setOp(ns,op){
@@ -246,29 +547,42 @@ function setOp(ns,op){
   else if(ns==="edit")S.editando.operacion=op;
   render();
 }
-function selManto(t){S.manto.tipo=t;render();}
+function selManto(t){
+  S.manto.tipo=t;
+  if(t!=="Emergencia")S.manto.subtipo="";
+  render();
+}
+function selMantoSub(t){S.manto.subtipo=t;render();}
 function selMantoEdit(t){S.editando.tipoManto=t;render();}
 function selParte(ns,parte){
   if(ns.indexOf("prod_")===0){var i=parseInt(ns.replace("prod_",""));S.prod.partidas[i].noParte=parte;S.prod.partidas[i].q=parte;S.prod.partidas[i].operacion="";S.prod.partidas[i].desc="";}
   else if(ns==="setup"){S.setup.noParte=parte;S.setup.q=parte;S.setup.operacion="";}
-  else if(ns==="edit"){
-    S.editando.noParte=parte;S.editando.q=parte;S.editando.operacion="";
-  }
+  else if(ns==="edit"){S.editando.noParte=parte;S.editando.q=parte;S.editando.operacion="";}
   render();
 }
 function delPartida(i){S.prod.partidas.splice(i,1);render();}
 function addPartida(){S.prod.partidas.push(mkPartida());render();}
-function editarRegistro(idx){
-  var r=S.miturno.data[idx];
-  var tsDate=parsearTimestamp(r.timestamp);
-  var ahora=new Date();
-  if(r.timestamp&&tsDate&&((ahora-tsDate)/3600000>72)){alert("Solo puedes editar registros de los ultimos 3 dias.");return;}
-  var ed={};for(var k in r)ed[k]=r[k];ed.idx=idx;
-  var np=String(ed.noParte||"");
-  ed.q=np.indexOf("Otro")===0?"Otro":np;
-  S.editando=ed;render();
-}
 function cancelarEdicion(){S.editando=null;render();}
+
+function solCrearPrioridad(p){S.sol.crear.prioridad=p;if(p!=="Urgente")S.sol.crear.maquinaParada="";render();}
+function solCrearParada(v){S.sol.crear.maquinaParada=v;render();}
+function solCrearOpen(){S.sol.crear.showing=true;render();}
+function solCrearClose(){S.sol.crear={maquina:"",prioridad:"",maquinaParada:"",descripcion:"",showing:false};render();}
+function solVer(id){cargarDetalleSolicitud(id);}
+function solVolver(){S.sol.viendo=null;S.sol.detalle=null;S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};S.sol.descartar={showing:false,motivo:""};S.sol.rechazar={showing:false,motivo:""};cargarSolicitudes();}
+function avanceOpen(){S.sol.avance.showing=true;render();}
+function avanceClose(){S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};render();}
+function avanceTipo(t){S.sol.avance.tipo=t;if(t!=="Emergencia")S.sol.avance.subtipo="";render();}
+function avanceSubtipo(t){S.sol.avance.subtipo=t;render();}
+function avanceToggleCierre(){S.sol.avance.esCierre=!S.sol.avance.esCierre;render();}
+function descartarOpen(){S.sol.descartar.showing=true;render();}
+function descartarClose(){S.sol.descartar={showing:false,motivo:""};render();}
+function rechazarOpen(){S.sol.rechazar.showing=true;render();}
+function rechazarClose(){S.sol.rechazar={showing:false,motivo:""};render();}
+
+// ============================================================
+// RENDER
+// ============================================================
 
 function render(){
   var app=document.getElementById("app");
@@ -299,6 +613,10 @@ function mkResumenCard(label,val,color){
   return '<div style="background:#fff;border-radius:12px;padding:12px;text-align:center;border:1px solid #eee"><p style="font-size:11px;color:#888;margin-bottom:4px">'+label+'</p><p style="font-size:28px;font-weight:700;color:'+color+'">'+val+'</p></div>';
 }
 
+// ============================================================
+// RENDER RESUMEN (DUEÑO)
+// ============================================================
+
 function buildResumen(){
   var r=S.resumen,rows=r.data||[];
   var prod=rows.filter(function(x){return x.tipo==="Produccion"||x.tipo==="Producción";});
@@ -324,8 +642,9 @@ function buildResumen(){
   var totalSetup=setup.reduce(function(a,r){return a+(parseFloat(r.horasSetup)||0);},0);
   var totalManto=manto.reduce(function(a,r){return a+(parseFloat(r.horasManto)||0);},0);
   var sinRep='<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>';
+  var areas=areasPrincipales();
   var estadoHTML='<div class="card" style="margin-bottom:16px"><p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MAQUINAS</p>'
-    +AREAS.map(function(a){
+    +areas.map(function(a){
       return'<p class="area-label" style="margin-top:8px">'+a.area+'</p>'
         +a.maquinas.map(function(m){
           var tP=byMaq[m]&&byMaq[m].length>0,tS=setupByMaq[m]&&setupByMaq[m].horas>0,tM=mantoByMaq[m]&&mantoByMaq[m].horas>0;
@@ -342,8 +661,25 @@ function buildResumen(){
         +(hManto?'<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#BA7517;font-weight:500">Manto - '+hManto.tipos.join(", ")+'</span><span style="font-size:15px;font-weight:700;color:#BA7517">'+hManto.horas.toFixed(1)+' hrs</span></div>':"")
         +'</div>';
     }).join("");
+
+  // Sección ver operador
+  var empOpts='<option value="">-- seleccionar --</option>'+CAT.empleados.map(function(e){return'<option value="'+e.numero+'"'+(S.verOp.empleadoSel==e.numero?" selected":"")+'>'+e.numero+' - '+e.nombre+'</option>';}).join("");
+  var verOpSection='<div class="card"><p style="font-weight:600;font-size:14px;margin-bottom:10px">Ver / editar registros de operador</p>'
+    +'<div class="field"><select id="verOpEmp">'+empOpts+'</select></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
+    +'<input type="text" id="verOpFecha" value="'+S.verOp.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
+    +'<button class="turno-btn'+(S.verOp.turno==="1ro"?" active":"")+'\" id="voT1">1ro</button>'
+    +'<button class="turno-btn'+(S.verOp.turno==="3ro"?" active":"")+'\" id="voT3">3ro</button>'
+    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="voBuscar">Buscar</button></div>'
+    +(S.verOp.loading?'<div style="text-align:center;padding:1rem;color:#888">Cargando...</div>':"")
+    +(S.verOp.data?buildVerOpLista():"")
+    +'</div>';
+
   return'<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><span style="font-weight:600;font-size:18px">Resumen del turno</span><button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
+    +'<span style="font-weight:600;font-size:18px">Panel Dueño</span>'
+    +'<div><button class="refresh-btn" id="btnRefreshRes" style="margin-right:8px">↻</button>'
+    +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div></div>'
     +'<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
     +'<input type="text" id="resumenFecha" value="'+r.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
     +'<button class="turno-btn'+(r.turno==="1ro"?" active":"")+'\" id="rt1">1ro</button>'
@@ -355,19 +691,52 @@ function buildResumen(){
         +mkResumenCard("HRS SETUP",totalSetup.toFixed(1),"#185FA5")
         +mkResumenCard("HRS MANTO",totalManto.toFixed(1),"#BA7517")
         +'</div>'+estadoHTML+detalleHTML)
+    +verOpSection
     +'</div>';
 }
-function bindResumen(){
-  document.getElementById("btnSalirRes").addEventListener("click",doSalirResumen);
-  document.getElementById("rt1").addEventListener("click",function(){setRTurno("1ro");});
-  document.getElementById("rt3").addEventListener("click",function(){setRTurno("3ro");});
-  document.getElementById("btnBuscar").addEventListener("click",doBuscarResumen);
-  var inp=document.getElementById("resumenFecha");if(inp)inp.addEventListener("change",function(e){S.resumen.fecha=e.target.value;});
+
+function buildVerOpLista(){
+  if(S.editando){return buildEditando();}
+  var rows=S.verOp.data||[];
+  if(!rows.length)return'<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin registros</p>';
+  return rows.map(function(r,idx){
+    var esProd=r.tipo==="Produccion"||r.tipo==="Producción",esSetup=r.tipo==="Setup";
+    var color=esProd?"#1D9E75":esSetup?"#185FA5":"#BA7517";
+    var valor=esProd?(r.piezas||"0")+" pzs":esSetup?(r.horasSetup||"0")+" hrs":(r.horasManto||"0")+" hrs";
+    return'<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div><span style="font-size:15px;font-weight:500">'+(r.maquina||"")+'</span><span style="font-size:12px;color:#888;margin-left:6px">'+(r.noParte||"")+'</span>'+(r.operacion?'<span style="font-size:12px;color:#aaa;margin-left:4px">'+r.operacion+'</span>':"")+'</div>'
+      +'<div style="text-align:right"><span style="font-size:16px;font-weight:700;color:'+color+'">'+valor+'</span><span style="display:block;font-size:11px;font-weight:600;color:'+color+'">'+r.tipo+'</span></div></div>'
+      +'<button class="edit-btn" data-dueedidx="'+idx+'">Editar</button><button class="borrar-btn" data-duebidx="'+idx+'">Borrar</button>'
+      +'</div>';
+  }).join("");
 }
 
+function bindResumen(){
+  document.getElementById("btnSalirRes").addEventListener("click",doSalirResumen);
+  document.getElementById("btnRefreshRes").addEventListener("click",cargarResumen);
+  document.getElementById("rt1").addEventListener("click",function(){setRTurno("1ro");});
+  document.getElementById("rt3").addEventListener("click",function(){setRTurno("3ro");});
+  document.getElementById("btnBuscar").addEventListener("click",function(){var inp=document.getElementById("resumenFecha");if(inp)S.resumen.fecha=inp.value;cargarResumen();});
+  var inp=document.getElementById("resumenFecha");if(inp)inp.addEventListener("change",function(e){S.resumen.fecha=e.target.value;});
+  var voEmp=document.getElementById("verOpEmp");if(voEmp)voEmp.addEventListener("change",function(e){S.verOp.empleadoSel=e.target.value;});
+  var voF=document.getElementById("verOpFecha");if(voF)voF.addEventListener("change",function(e){S.verOp.fecha=e.target.value;});
+  var vot1=document.getElementById("voT1");if(vot1)vot1.addEventListener("click",function(){S.verOp.turno="1ro";render();});
+  var vot3=document.getElementById("voT3");if(vot3)vot3.addEventListener("click",function(){S.verOp.turno="3ro";render();});
+  var vob=document.getElementById("voBuscar");if(vob)vob.addEventListener("click",function(){var f=document.getElementById("verOpFecha");if(f)S.verOp.fecha=f.value;cargarVerOperador();});
+  document.querySelectorAll("[data-dueedidx]").forEach(function(el){el.addEventListener("click",function(){editarRegistro(S.verOp.data,parseInt(el.dataset.dueedidx));});});
+  document.querySelectorAll("[data-duebidx]").forEach(function(el){el.addEventListener("click",function(){borrarRegistro(S.verOp.data,parseInt(el.dataset.duebidx));});});
+  // Si está editando, aplicar bindings de edición
+  if(S.editando)bindEditando();
+}
+
+// ============================================================
+// RENDER EDITANDO (reutilizable para operador y dueño)
+// ============================================================
+
 function buildEditMaquinas(selMaq){
-  var html="";
-  AREAS.forEach(function(a){
+  var html="",areas=areasPrincipales();
+  areas.forEach(function(a){
     var cols=Math.min(a.maquinas.length,2);
     html+='<p class="area-label">'+a.area+'</p><div class="btn-grid" style="grid-template-columns:repeat('+cols+',1fr)">';
     a.maquinas.forEach(function(m){html+='<button class="big-btn'+(selMaq===m?" active":"")+'\" data-ns="edit" data-maq="'+m+'">'+m+'</button>';});
@@ -391,7 +760,7 @@ function buildEditOpBtns(ops,selected,maq){
   return html+'</div></div>';
 }
 function buildEditTipoManto(sel){
-  var btns=tiposManto().map(function(t){return'<button class="big-btn'+(sel===t?" active":"")+'\" data-mantoedit="'+t+'">'+t+'</button>';}).join("");
+  var btns=tiposMantoPrincipales().map(function(t){return'<button class="big-btn'+(sel===t?" active":"")+'\" data-mantoedit="'+t+'">'+t+'</button>';}).join("");
   return'<div class="field"><label>Tipo de mantenimiento</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+btns+'</div></div>';
 }
 
@@ -425,15 +794,9 @@ function buildEditando(){
       html+='<div class="field"><label>Que se realizo?</label><textarea id="edDescOtro" placeholder="Describe brevemente...">'+descOtro+'</textarea></div>';
     }
     html+='<div class="field"><label>Orden de trabajo</label><input type="tel" inputmode="numeric" pattern="[0-9]*" class="ot-input" placeholder="550214" id="edOT" value="'+(ed.ordenTrabajo||"")+'"></div>';
-    if(ed.noParte&&!esOtro&&ops.length){
-      html+=buildEditOpBtns(ops,ed.operacion,ed.maquina);
-    }
-    if(esProd&&esOtro&&opsOtro.length){
-      html+=buildEditOpBtns(opsOtro,ed.operacion,ed.maquina);
-    }
-    if(area==="torno"&&ed.operacion==="100a"){
-      html+='<div class="torno-note">Rectificado Interior en Torno - reportado como 100s</div>';
-    }
+    if(ed.noParte&&!esOtro&&ops.length){html+=buildEditOpBtns(ops,ed.operacion,ed.maquina);}
+    if(esProd&&esOtro&&opsOtro.length){html+=buildEditOpBtns(opsOtro,ed.operacion,ed.maquina);}
+    if(area==="torno"&&ed.operacion==="100a"){html+='<div class="torno-note">Rectificado Interior en Torno - reportado como 100s</div>';}
     if(tc){html+='<div class="tc-note">Tiempo de ciclo: <strong>'+tc+' min</strong></div>';}
   }
 
@@ -458,6 +821,53 @@ function buildEditando(){
   return html;
 }
 
+function bindEditando(){
+  var bce=document.getElementById("btnCancelarEd");if(bce)bce.addEventListener("click",cancelarEdicion);
+  var bge=document.getElementById("btnGuardarEd");
+  if(bge)bge.addEventListener("click",function(){
+    var ed=S.editando;
+    var esProd=ed.tipo==="Producción"||ed.tipo==="Produccion";
+    var esSetup=ed.tipo==="Setup",esManto=ed.tipo==="Mantenimiento";
+    var npStr=String(ed.noParte||"");
+    var esOtro=npStr.indexOf("Otro")===0;
+    var ot=document.getElementById("edOT");if(ot)ed.ordenTrabajo=ot.value;
+    if(esProd){
+      if(esOtro){
+        var dOtro=document.getElementById("edDescOtro");
+        var descTxt=dOtro?dOtro.value:"";
+        ed.noParte="Otro"+(descTxt?" - "+descTxt:"");
+        var hO=document.getElementById("edHorasOtro");
+        if(hO){ed.horasSetup=hO.value;ed.piezas="";}
+      }else{
+        var pz=document.getElementById("edPiezas");if(pz){ed.piezas=pz.value;ed.horasSetup="";}
+      }
+    }
+    if(esSetup){
+      var hs=document.getElementById("edHorasSetup");if(hs)ed.horasSetup=hs.value;
+    }
+    if(esManto){
+      var hm=document.getElementById("edHorasManto");if(hm)ed.horasManto=hm.value;
+      var ds=document.getElementById("edDescManto");if(ds)ed.descripcion=ds.value;
+    }
+    guardarEdicion();
+  });
+  document.querySelectorAll("[data-maq]").forEach(function(el){el.addEventListener("click",function(){setMaq(el.dataset.ns,el.dataset.maq);});});
+  document.querySelectorAll("[data-op]").forEach(function(el){el.addEventListener("click",function(){setOp(el.dataset.ns,el.dataset.op);});});
+  document.querySelectorAll("[data-mantoedit]").forEach(function(el){el.addEventListener("click",function(){selMantoEdit(el.dataset.mantoedit);});});
+  document.querySelectorAll("[data-parte]").forEach(function(el){el.addEventListener("click",function(){selParte(el.dataset.ns,el.dataset.parte);});});
+  document.querySelectorAll("[data-search]").forEach(function(el){
+    el.addEventListener("input",function(){
+      var ns=el.dataset.search,q=el.value;
+      if(ns==="edit"){S.editando.q=q;S.editando.noParte="";S.editando.operacion="";}
+      render();
+    });
+  });
+}
+
+// ============================================================
+// MI TURNO
+// ============================================================
+
 function buildMiTurno(){
   var mt=S.miturno,rows=mt.data||[];
   if(S.editando){return buildEditando();}
@@ -468,8 +878,7 @@ function buildMiTurno(){
       var esProd=r.tipo==="Produccion"||r.tipo==="Producción",esSetup=r.tipo==="Setup";
       var color=esProd?"#1D9E75":esSetup?"#185FA5":"#BA7517";
       var valor=esProd?(r.piezas||"0")+" pzs":esSetup?(r.horasSetup||"0")+" hrs":(r.horasManto||"0")+" hrs";
-      var tsDate=parsearTimestamp(r.timestamp);
-      var ahora=new Date();
+      var tsDate=parsearTimestamp(r.timestamp),ahora=new Date();
       var puedeEditar=tsDate&&((ahora-tsDate)/3600000<=72);
       return'<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
@@ -482,7 +891,8 @@ function buildMiTurno(){
     +'<input type="text" id="mtFecha" value="'+mt.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
     +'<button class="turno-btn'+(mt.turno==="1ro"?" active":"")+'\" id="mt1">1ro</button>'
     +'<button class="turno-btn'+(mt.turno==="3ro"?" active":"")+'\" id="mt3">3ro</button>'
-    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="mtBuscar">Buscar</button></div></div>'
+    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="mtBuscar">Buscar</button>'
+    +'<button class="refresh-btn" id="mtRefresh">↻</button></div></div>'
     +(mt.loading?'<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
       :'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
         +mkResumenCard("PIEZAS",totalPiezas,"#1D9E75")
@@ -525,9 +935,16 @@ function bindDone(){
   document.getElementById("btnIni").addEventListener("click",doSalir);
 }
 
+// ============================================================
+// RENDER PRODUCCION / SETUP / MANTO DIRECTO
+// ============================================================
+
 function buildMaquinas(ns){
-  var sel=ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:S.manto.maquina,html="";
-  AREAS.forEach(function(a){
+  var sel=ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:ns==="manto"?S.manto.maquina:ns==="solcrear"?S.sol.crear.maquina:"";
+  var html="";
+  // Para manto y solcrear usamos TODAS las máquinas (incluye secundarias)
+  var areas=(ns==="manto"||ns==="solcrear")?areasTodas():areasPrincipales();
+  areas.forEach(function(a){
     var cols=Math.min(a.maquinas.length,2);
     html+='<p class="area-label">'+a.area+'</p><div class="btn-grid" style="grid-template-columns:repeat('+cols+',1fr)">';
     a.maquinas.forEach(function(m){html+='<button class="big-btn'+(sel===m?" active":"")+'\" data-ns="'+ns+'" data-maq="'+m+'">'+m+'</button>';});
@@ -578,83 +995,359 @@ function buildSetup(){
     +'<button class="send-btn" style="background:#185FA5" id="sendSetup"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte de setup")+'</button>';
 }
 function buildManto(){
-  var m=S.manto,btns=tiposManto().map(function(t){return'<button class="big-btn'+(m.tipo===t?" active":"")+'\" data-manto="'+t+'">'+t+'</button>';}).join("");
+  var m=S.manto;
+  var btns=tiposMantoPrincipales().map(function(t){return'<button class="big-btn'+(m.tipo===t?" active":"")+'\" data-manto="'+t+'">'+t+'</button>';}).join("");
+  var subBox="";
+  if(m.tipo==="Emergencia"){
+    var subs=tiposMantoSub("Emergencia");
+    if(subs.length){
+      var sbtns=subs.map(function(t){return'<button class="big-btn'+(m.subtipo===t?" active":"")+'\" data-mantosub="'+t+'">'+t+'</button>';}).join("");
+      subBox='<div class="sub-cat-box"><label>Subcategoria de Emergencia</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+sbtns+'</div></div>';
+    }
+  }
   return'<div class="section"><label>Maquina</label>'+buildMaquinas("manto")+'</div><div class="card">'
-    +'<div class="field"><label>Tipo de mantenimiento</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+btns+'</div></div>'
+    +'<div class="field"><label>Tipo de mantenimiento</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+btns+'</div>'+subBox+'</div>'
     +'<div class="field"><label>Descripcion</label><textarea id="mantoDesc" placeholder="Describe el trabajo realizado...">'+m.descripcion+'</textarea></div>'
     +'<div class="field"><label>Horas de mantenimiento</label><input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="mantoHoras" value="'+m.horas+'" step="0.5"></div></div>'
     +'<button class="send-btn" style="background:#BA7517" id="sendManto"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte de mantenimiento")+'</button>';
 }
+
+// ============================================================
+// HEADER Y TABS PRINCIPALES
+// ============================================================
+
 function buildMain(){
   var fecha=getFecha();
+  var emp=S.empleado;
   var header='<div class="header"><div style="background:#000;border-radius:8px;padding:4px 8px;display:inline-block"><span style="color:#fff;font-weight:900;font-size:22px;letter-spacing:-1px">MK</span><span style="color:#1D9E75;font-weight:900;font-size:22px">M</span></div>'
     +'<div style="text-align:right"><div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px;align-items:center"><input type="text" id="fechaInput" value="'+fecha+'" placeholder="dd/mm/yyyy" style="width:115px;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;text-align:center;background:#fff;font-weight:500"></div>'
     +'<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px"><span style="font-size:13px;color:#888;line-height:26px">Turno</span><button class="turno-btn'+(S.turno==="1ro"?" active":"")+'\" id="t1">1ro</button><button class="turno-btn'+(S.turno==="3ro"?" active":"")+'\" id="t3">3ro</button></div>'
-    +'<div style="font-size:12px"><span style="color:#888">'+S.empleado.numero+' - </span><span style="font-weight:500">'+S.empleado.nombre.split(",")[0]+'</span><button class="salir-btn" id="btnSalir">Salir</button></div></div></div>';
-  var tabs='<div class="tab-bar">'
-    +'<button class="tab-btn'+(S.tab==="produccion"?" active":"")+'\" id="tabP">Produccion</button>'
-    +'<button class="tab-btn'+(S.tab==="setup"?" active":"")+'\" id="tabS">Setup</button>'
-    +'<button class="tab-btn'+(S.tab==="manto"?" active":"")+'\" id="tabM">Manto</button>'
-    +'<button class="tab-btn'+(S.tab==="miturno"?" active":"")+'\" id="tabMT">Mi turno</button></div>';
-  var body=S.tab==="produccion"?buildProd():S.tab==="setup"?buildSetup():S.tab==="manto"?buildManto():buildMiTurno();
-  return header+tabs+body;
+    +'<div style="font-size:12px"><span style="color:#888">'+emp.numero+' - </span><span style="font-weight:500">'+emp.nombre.split(",")[0]+'</span><button class="salir-btn" id="btnSalir">Salir</button></div></div></div>';
+
+  // Tabs: dependen del rol
+  var tabsArr=[];
+  if(!emp.esManto){
+    tabsArr.push({id:"produccion",label:"Produccion"});
+    tabsArr.push({id:"setup",label:"Setup"});
+  }
+  tabsArr.push({id:"manto",label:"Manto"});
+  tabsArr.push({id:"solicitudes",label:"Solicitudes"});
+  tabsArr.push({id:"miturno",label:"Mi turno"});
+
+  var tabsHtml='<div class="tab-bar">'+tabsArr.map(function(t){
+    return'<button class="tab-btn'+(S.tab===t.id?" active":"")+'\" data-tab="'+t.id+'">'+t.label+'</button>';
+  }).join("")+'</div>';
+
+  var body="";
+  if(S.tab==="produccion")body=buildProd();
+  else if(S.tab==="setup")body=buildSetup();
+  else if(S.tab==="manto")body=buildManto();
+  else if(S.tab==="miturno")body=buildMiTurno();
+  else if(S.tab==="solicitudes")body=buildSolicitudes();
+  return header+tabsHtml+body;
 }
+
+// ============================================================
+// RENDER SOLICITUDES
+// ============================================================
+
+function estadoPillClass(estado){
+  var e=String(estado||"").toLowerCase();
+  if(e==="abierta")return"estado-abierta";
+  if(e==="en proceso")return"estado-proceso";
+  if(e==="cierre propuesto")return"estado-cierre";
+  if(e==="aceptada")return"estado-aceptada";
+  if(e==="descartada")return"estado-descartada";
+  return"estado-proceso";
+}
+
+function buildSolicitudes(){
+  if(S.sol.crear.showing)return buildSolCrear();
+  if(S.sol.viendo&&(S.sol.detalleLoading||S.sol.detalle))return buildSolDetalle();
+  return buildSolLista();
+}
+
+function buildSolLista(){
+  var emp=S.empleado,sub=S.sol.subTab;
+  // Sub-tabs según rol
+  var subTabs=[];
+  if(emp.puedeSolicitar||emp.esManto)subTabs.push({id:"mias",label:"Mis solicitudes"});
+  if(emp.puedeAceptar)subTabs.push({id:"por_aceptar",label:"Por aceptar"});
+  if(emp.esManto)subTabs.push({id:"cola_manto",label:"Cola manto"});
+  subTabs.push({id:"todas",label:"Todas activas"});
+  subTabs.push({id:"cerradas",label:"Cerradas"});
+
+  // Validar que subTab actual exista
+  var existe=subTabs.some(function(t){return t.id===sub;});
+  if(!existe){sub=subTabs[0].id;S.sol.subTab=sub;}
+
+  var subTabsHtml='<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px">'+subTabs.map(function(t){
+    return'<button data-soltab="'+t.id+'" style="padding:6px 12px;border-radius:14px;border:1px solid '+(sub===t.id?"#1D9E75":"#ddd")+';background:'+(sub===t.id?"#1D9E75":"transparent")+';color:'+(sub===t.id?"#fff":"#666")+';font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap">'+t.label+'</button>';
+  }).join("")+'</div>';
+
+  // Botón nueva solicitud (solo si puede solicitar o es manto)
+  var btnNueva="";
+  if(emp.puedeSolicitar||emp.esManto){
+    btnNueva='<button class="send-btn" style="background:#1D9E75;margin-bottom:14px" id="btnSolNueva">+ Nueva solicitud</button>';
+  }
+
+  var refreshBtn='<button class="refresh-btn" id="btnSolRefresh" style="margin-left:8px">↻</button>';
+
+  // Filtrado en cliente según subTab (el servidor ya filtra básico, aquí afinamos)
+  var rows=S.sol.data||[];
+  var filtrado=rows.slice();
+  if(sub==="por_aceptar"){
+    filtrado=filtrado.filter(function(s){return s.estado==="Cierre propuesto";});
+  }else if(sub==="cola_manto"){
+    filtrado=filtrado.filter(function(s){return s.estado==="Abierta"||s.estado==="En proceso";});
+  }else if(sub==="mias"){
+    // Server ya filtró por usuario, pero puede traer cerradas — quitamos
+    filtrado=filtrado.filter(function(s){return s.estado!=="Aceptada"&&s.estado!=="Descartada";});
+  }else if(sub==="todas"){
+    filtrado=filtrado.filter(function(s){return s.estado!=="Aceptada"&&s.estado!=="Descartada";});
+  }
+
+  var listaHtml=S.sol.loading?'<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
+    :filtrado.length===0?'<div class="card" style="text-align:center;color:#888">Sin solicitudes</div>'
+    :filtrado.map(function(s){
+      var cls=s.prioridad==="Urgente"?"urgente":"normal";
+      var estClass=estadoPillClass(s.estado);
+      return'<div class="card sol-card '+cls+'" data-solver="'+s.id+'" style="cursor:pointer">'
+        +'<div class="sol-header">'
+        +'<div style="flex:1"><div class="sol-id">'+s.id+'</div>'
+        +'<div style="font-size:15px;font-weight:600;margin-top:2px">'+s.maquina+'</div>'
+        +'<div style="font-size:12px;color:#888;margin-top:2px">'+s.fecha+' · '+s.turno+' · '+(String(s.solicitante||"").split(" - ")[0])+'</div></div>'
+        +'<div style="text-align:right"><span class="pill estado-'+cls+'" style="background:'+(s.prioridad==="Urgente"?"#FBE5E5":"#E6F1FB")+';color:'+(s.prioridad==="Urgente"?"#E24B4A":"#185FA5")+'">'+s.prioridad+'</span>'
+        +'<br><span class="estado-pill '+estClass+'">'+s.estado+'</span></div></div>'
+        +'<div style="font-size:13px;color:#555;margin-top:8px">'+(s.descripcion||"").substring(0,100)+(String(s.descripcion||"").length>100?"...":"")+'</div>'
+        +'</div>';
+    }).join("");
+
+  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span style="font-size:16px;font-weight:600">Solicitudes de mantenimiento</span>'
+    +refreshBtn+'</div>'
+    +subTabsHtml+btnNueva+listaHtml;
+}
+
+function buildSolCrear(){
+  var c=S.sol.crear;
+  var prioridadBtns='<div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
+    +'<button class="big-btn urgente'+(c.prioridad==="Urgente"?" active":"")+'\" data-prio="Urgente">🔴 Urgente</button>'
+    +'<button class="big-btn'+(c.prioridad==="Normal"?" active":"")+'\" data-prio="Normal">🔵 Normal</button></div>';
+  var paradaSec="";
+  if(c.prioridad==="Urgente"){
+    paradaSec='<div class="field"><label>¿Maquina parada?</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'
+      +'<button class="big-btn'+(c.maquinaParada==="Sí"?" active":"")+'\" data-parada="Sí">Sí, parada</button>'
+      +'<button class="big-btn'+(c.maquinaParada==="No"?" active":"")+'\" data-parada="No">No, opera</button></div></div>';
+  }
+  return'<div class="card">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-weight:600;font-size:16px">Nueva solicitud</span>'
+    +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnSolCerrar">Cancelar</button></div>'
+    +'<p style="font-size:12px;color:#888;margin-bottom:12px">La fecha y turno se registran automáticamente con la hora real de envío.</p>'
+    +'<div class="section"><label>Máquina</label>'+buildMaquinas("solcrear")+'</div>'
+    +'<div class="field"><label>Prioridad</label>'+prioridadBtns+'</div>'
+    +paradaSec
+    +'<div class="field"><label>Descripción de la falla</label><textarea id="solDesc" placeholder="Describe qué está pasando con la máquina...">'+c.descripcion+'</textarea></div>'
+    +'</div>'
+    +'<button class="send-btn" style="background:#1D9E75" id="btnSolEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Crear solicitud")+'</button>';
+}
+
+function buildSolDetalle(){
+  if(S.sol.detalleLoading)return'<div class="spinner">Cargando detalle...</div>';
+  var d=S.sol.detalle;if(!d)return'<div class="card">Sin detalle</div>';
+  var s=d.solicitud,avances=d.avances||[];
+  var emp=S.empleado;
+
+  // Permisos sobre esta solicitud
+  var soySolicitante=String(s.solicitante||"").indexOf(emp.numero)>=0;
+  var puedeAceptar=emp.puedeAceptar||S.esDueno;
+  // Candado: último técnico que cerró no puede aceptarla
+  var ultimoTecCierre="";
+  for(var i=0;i<avances.length;i++){
+    if(avances[i].esCierre==="Sí")ultimoTecCierre=String(avances[i].tecnico||"").split(" - ")[0];
+  }
+  var soyElQueCerro=ultimoTecCierre===emp.numero;
+  var puedeAceptarEsta=puedeAceptar&&!soyElQueCerro&&s.estado==="Cierre propuesto";
+  var puedeRechazarEsta=puedeAceptar&&!soyElQueCerro&&s.estado==="Cierre propuesto";
+  var puedeAvanzar=emp.esManto&&s.estado!=="Aceptada"&&s.estado!=="Descartada";
+  var puedeDescartar=emp.esManto&&(s.estado==="Abierta"||s.estado==="En proceso");
+  var estaCerrada=s.estado==="Aceptada"||s.estado==="Descartada";
+
+  var infoSol='<div class="card">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+    +'<div><div class="sol-id">'+s.id+'</div>'
+    +'<div style="font-size:17px;font-weight:700;margin-top:4px">'+s.maquina+'</div></div>'
+    +'<div style="text-align:right"><span class="pill" style="background:'+(s.prioridad==="Urgente"?"#FBE5E5":"#E6F1FB")+';color:'+(s.prioridad==="Urgente"?"#E24B4A":"#185FA5")+'">'+s.prioridad+'</span>'
+    +'<br><span class="estado-pill '+estadoPillClass(s.estado)+'" style="margin-top:4px;display:inline-block">'+s.estado+'</span></div></div>'
+    +'<div style="font-size:13px;color:#666;margin-bottom:6px">Abierta: '+s.timestamp+'</div>'
+    +'<div style="font-size:13px;color:#666;margin-bottom:6px">Solicitante: '+s.solicitante+'</div>'
+    +(s.maquinaParada?'<div style="font-size:13px;color:#E24B4A;font-weight:600;margin-bottom:6px">⚠ Maquina parada: '+s.maquinaParada+'</div>':"")
+    +'<div style="font-size:14px;margin-top:10px;padding:10px;background:#f9f9f7;border-radius:10px">'+s.descripcion+'</div>'
+    +(s.motivoRechazo?'<div style="font-size:13px;color:#E24B4A;margin-top:8px">Rechazo previo: '+s.motivoRechazo+'</div>':"")
+    +(s.tsAceptacion?'<div style="font-size:12px;color:#888;margin-top:10px">Cerrada: '+s.tsAceptacion+' por '+(s.aceptadoPor||"")+'</div>':"")
+    +(s.tmi?'<div style="font-size:13px;margin-top:8px"><strong>TMI:</strong> '+s.tmi+' hrs'+(s.tmpAuto?' · <strong>TMP_Auto:</strong> '+s.tmpAuto+' hrs':"")+'</div>':"")
+    +'</div>';
+
+  var avancesHtml='<div class="card"><p style="font-weight:600;font-size:14px;margin-bottom:10px">Avances ('+avances.length+')</p>'
+    +(avances.length===0?'<p style="color:#888;font-size:13px">Sin avances aún</p>':avances.map(function(a){
+      var esDesc=a.esDescarte==="Sí",esC=a.esCierre==="Sí";
+      return'<div class="avance-item">'
+        +'<div class="avance-header"><span>'+a.timestamp+' · '+a.turno+'</span><span>'+(a.tecnico||"").split(" - ")[0]+'</span></div>'
+        +(esDesc?'<div style="font-size:12px;color:#888;font-weight:600">DESCARTE</div>':"")
+        +(esC?'<div style="font-size:12px;color:#7C3AED;font-weight:600">CIERRE PROPUESTO</div>':"")
+        +'<div style="font-size:14px;margin:4px 0">'+(a.actividades||"")+'</div>'
+        +'<div style="font-size:12px;color:#666">'+(a.clasificacion||"")+(a.horas?' · '+a.horas+' hrs':"")+'</div>'
+        +(esDesc&&a.motivoDescarte?'<div style="font-size:12px;color:#888;margin-top:4px">Motivo: '+a.motivoDescarte+'</div>':"")
+        +'</div>';
+    }).join(""))+'</div>';
+
+  // Formularios de acción
+  var accionesHtml='';
+  if(S.sol.avance.showing)accionesHtml=buildAvanceForm();
+  else if(S.sol.descartar.showing)accionesHtml=buildDescartarForm();
+  else if(S.sol.rechazar.showing)accionesHtml=buildRechazarForm();
+  else if(!estaCerrada){
+    var btns='';
+    if(puedeAvanzar)btns+='<button class="send-btn" style="background:#1D9E75" id="btnSolAvance">+ Nuevo avance</button>';
+    if(puedeAceptarEsta)btns+='<button class="btn-accept" style="width:100%;padding:14px;margin-top:8px;font-size:16px" id="btnSolAcept">✓ Aceptar cierre</button>';
+    if(puedeRechazarEsta)btns+='<button class="btn-reject" style="width:100%;padding:14px;margin-top:8px;font-size:16px" id="btnSolRechaz">✗ Rechazar cierre</button>';
+    if(puedeDescartar)btns+='<button class="btn-discard" style="width:100%;padding:14px;margin-top:8px;font-size:16px" id="btnSolDesc">Descartar solicitud</button>';
+    if(S.esDueno&&s.estado==="Cierre propuesto")btns+='<button class="btn-discard" style="width:100%;padding:14px;margin-top:8px;font-size:16px;color:#BA7517;border-color:#BA7517" id="btnSolForzar">Forzar cierre (dueño)</button>';
+    if(soyElQueCerro&&s.estado==="Cierre propuesto")btns+='<p style="font-size:12px;color:#BA7517;text-align:center;margin-top:10px;padding:10px;background:#FAEEDA;border-radius:10px">Tú cerraste esta solicitud. Debe aceptarla otra persona con permisos.</p>';
+    accionesHtml=btns;
+  }
+
+  return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<button style="font-size:13px;color:#185FA5;background:none;border:none;cursor:pointer;padding:6px" id="btnSolVolver">← Volver</button>'
+    +'<button class="refresh-btn" id="btnSolDetRefresh">↻</button></div>'
+    +infoSol+avancesHtml+accionesHtml;
+}
+
+function buildAvanceForm(){
+  var a=S.sol.avance;
+  var btns=tiposMantoPrincipales().map(function(t){return'<button class="big-btn'+(a.tipo===t?" active":"")+'\" data-avtipo="'+t+'">'+t+'</button>';}).join("");
+  var subBox="";
+  if(a.tipo==="Emergencia"){
+    var subs=tiposMantoSub("Emergencia");
+    if(subs.length){
+      var sbtns=subs.map(function(t){return'<button class="big-btn'+(a.subtipo===t?" active":"")+'\" data-avsub="'+t+'">'+t+'</button>';}).join("");
+      subBox='<div class="sub-cat-box"><label>Subcategoria de Emergencia</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+sbtns+'</div></div>';
+    }
+  }
+  return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-weight:600;font-size:16px">Nuevo avance</span>'
+    +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnAvanceCerrar">Cancelar</button></div>'
+    +'<div class="field"><label>Clasificación</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+btns+'</div>'+subBox+'</div>'
+    +'<div class="field"><label>Actividades realizadas</label><textarea id="avActividades" placeholder="Describe las actividades realizadas en este avance...">'+a.actividades+'</textarea></div>'
+    +'<div class="field"><label>Horas invertidas</label><input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="avHoras" value="'+a.horas+'" step="0.5"></div>'
+    +'<div class="checkbox-row"><input type="checkbox" id="avEsCierre"'+(a.esCierre?" checked":"")+'><label for="avEsCierre" style="margin:0;font-weight:600;color:#7C3AED">Es propuesta de cierre</label></div>'
+    +'<p style="font-size:12px;color:#888;margin-top:4px">Marca si con este avance concluyes el trabajo y propones cierre de la solicitud.</p>'
+    +'</div>'
+    +'<button class="send-btn" style="background:#1D9E75" id="btnAvanceEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Registrar avance")+'</button>';
+}
+
+function buildDescartarForm(){
+  return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-weight:600;font-size:16px">Descartar solicitud</span>'
+    +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnDescCerrar">Cancelar</button></div>'
+    +'<p style="font-size:13px;color:#666;margin-bottom:10px">Usa esto solo si la solicitud se resolvió en el momento sin necesidad de trabajo formal, o si era un falso positivo.</p>'
+    +'<div class="field"><label>Motivo del descarte</label><textarea id="descMotivo" placeholder="Ej: Se resolvió en el momento - solo necesitaba reset...">'+S.sol.descartar.motivo+'</textarea></div>'
+    +'</div>'
+    +'<button class="send-btn" style="background:#888" id="btnDescEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Confirmar descarte")+'</button>';
+}
+
+function buildRechazarForm(){
+  return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-weight:600;font-size:16px">Rechazar cierre</span>'
+    +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnRechCerrar">Cancelar</button></div>'
+    +'<p style="font-size:13px;color:#666;margin-bottom:10px">La solicitud regresará a estado "En proceso" y Manto deberá continuar trabajando.</p>'
+    +'<div class="field"><label>Motivo del rechazo</label><textarea id="rechMotivo" placeholder="Ej: La falla persiste, sigue sin operar correctamente...">'+S.sol.rechazar.motivo+'</textarea></div>'
+    +'</div>'
+    +'<button class="send-btn" style="background:#E24B4A" id="btnRechEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Confirmar rechazo")+'</button>';
+}
+
+// ============================================================
+// BINDINGS
+// ============================================================
+
 function bindMain(){
   var fi=document.getElementById("fechaInput");if(fi)fi.addEventListener("change",function(e){S.fechaManual=e.target.value;});
   var t1=document.getElementById("t1");if(t1)t1.addEventListener("click",function(){setTurno("1ro");});
   var t3=document.getElementById("t3");if(t3)t3.addEventListener("click",function(){setTurno("3ro");});
   var bs=document.getElementById("btnSalir");if(bs)bs.addEventListener("click",doSalir);
-  var tp=document.getElementById("tabP");if(tp)tp.addEventListener("click",function(){setTab("produccion");});
-  var ts=document.getElementById("tabS");if(ts)ts.addEventListener("click",function(){setTab("setup");});
-  var tm=document.getElementById("tabM");if(tm)tm.addEventListener("click",function(){setTab("manto");});
-  var tmt=document.getElementById("tabMT");if(tmt)tmt.addEventListener("click",function(){setTab("miturno");});
+
+  document.querySelectorAll("[data-tab]").forEach(function(el){el.addEventListener("click",function(){setTab(el.dataset.tab);});});
+
+  // PRODUCCION
   var ap=document.getElementById("btnAddPartida");if(ap)ap.addEventListener("click",addPartida);
   var sp=document.getElementById("sendProd");if(sp)sp.addEventListener("click",sendProd);
+
+  // SETUP
   var ss=document.getElementById("sendSetup");if(ss)ss.addEventListener("click",sendSetup);
-  var sm=document.getElementById("sendManto");if(sm)sm.addEventListener("click",sendManto);
   var sh=document.getElementById("setupHoras");if(sh)sh.addEventListener("input",function(){S.setup.horas=sh.value;});
   var so=document.getElementById("setupOT");if(so)so.addEventListener("input",function(){S.setup.ot=so.value;});
+
+  // MANTO
+  var sm=document.getElementById("sendManto");if(sm)sm.addEventListener("click",sendManto);
   var md=document.getElementById("mantoDesc");if(md)md.addEventListener("input",function(){S.manto.descripcion=md.value;});
   var mh=document.getElementById("mantoHoras");if(mh)mh.addEventListener("input",function(){S.manto.horas=mh.value;});
+  document.querySelectorAll("[data-manto]").forEach(function(el){el.addEventListener("click",function(){selManto(el.dataset.manto);});});
+  document.querySelectorAll("[data-mantosub]").forEach(function(el){el.addEventListener("click",function(){selMantoSub(el.dataset.mantosub);});});
+
+  // MI TURNO
   var mt1=document.getElementById("mt1");if(mt1)mt1.addEventListener("click",function(){S.miturno.turno="1ro";render();});
   var mt3=document.getElementById("mt3");if(mt3)mt3.addEventListener("click",function(){S.miturno.turno="3ro";render();});
   var mtb=document.getElementById("mtBuscar");if(mtb)mtb.addEventListener("click",function(){var f=document.getElementById("mtFecha");if(f)S.miturno.fecha=f.value;cargarMiTurno();});
   var mtf=document.getElementById("mtFecha");if(mtf)mtf.addEventListener("change",function(e){S.miturno.fecha=e.target.value;});
-  var bce=document.getElementById("btnCancelarEd");if(bce)bce.addEventListener("click",cancelarEdicion);
-  var bge=document.getElementById("btnGuardarEd");
-  if(bge)bge.addEventListener("click",function(){
-    var ed=S.editando;
-    var esProd=ed.tipo==="Producción"||ed.tipo==="Produccion";
-    var esSetup=ed.tipo==="Setup",esManto=ed.tipo==="Mantenimiento";
-    var npStr=String(ed.noParte||"");
-    var esOtro=npStr.indexOf("Otro")===0;
-    var ot=document.getElementById("edOT");if(ot)ed.ordenTrabajo=ot.value;
-    if(esProd){
-      if(esOtro){
-        var dOtro=document.getElementById("edDescOtro");
-        var descTxt=dOtro?dOtro.value:"";
-        ed.noParte="Otro"+(descTxt?" - "+descTxt:"");
-        var hO=document.getElementById("edHorasOtro");
-        if(hO){ed.horasSetup=hO.value;ed.piezas="";}
-      }else{
-        var pz=document.getElementById("edPiezas");if(pz){ed.piezas=pz.value;ed.horasSetup="";}
-      }
-    }
-    if(esSetup){
-      var hs=document.getElementById("edHorasSetup");if(hs)ed.horasSetup=hs.value;
-    }
-    if(esManto){
-      var hm=document.getElementById("edHorasManto");if(hm)ed.horasManto=hm.value;
-      var ds=document.getElementById("edDescManto");if(ds)ed.descripcion=ds.value;
-    }
-    guardarEdicion();
-  });
-  document.querySelectorAll("[data-editidx]").forEach(function(el){el.addEventListener("click",function(){editarRegistro(parseInt(el.dataset.editidx));});});
-  document.querySelectorAll("[data-borraridx]").forEach(function(el){el.addEventListener("click",function(){borrarRegistro(parseInt(el.dataset.borraridx));});});
+  var mtr=document.getElementById("mtRefresh");if(mtr)mtr.addEventListener("click",cargarMiTurno);
+  document.querySelectorAll("[data-editidx]").forEach(function(el){el.addEventListener("click",function(){editarRegistro(S.miturno.data,parseInt(el.dataset.editidx));});});
+  document.querySelectorAll("[data-borraridx]").forEach(function(el){el.addEventListener("click",function(){borrarRegistro(S.miturno.data,parseInt(el.dataset.borraridx));});});
+
+  // EDITANDO
+  if(S.editando)bindEditando();
+
+  // SOLICITUDES
+  var srf=document.getElementById("btnSolRefresh");if(srf)srf.addEventListener("click",cargarSolicitudes);
+  var sdr=document.getElementById("btnSolDetRefresh");if(sdr)sdr.addEventListener("click",function(){cargarDetalleSolicitud(S.sol.viendo);});
+  var sn=document.getElementById("btnSolNueva");if(sn)sn.addEventListener("click",solCrearOpen);
+  var sc=document.getElementById("btnSolCerrar");if(sc)sc.addEventListener("click",solCrearClose);
+  var se=document.getElementById("btnSolEnviar");if(se)se.addEventListener("click",sendCrearSolicitud);
+  var sdv=document.getElementById("btnSolVolver");if(sdv)sdv.addEventListener("click",solVolver);
+  var savb=document.getElementById("btnSolAvance");if(savb)savb.addEventListener("click",avanceOpen);
+  var sacb=document.getElementById("btnSolAcept");if(sacb)sacb.addEventListener("click",sendAceptarSolicitud);
+  var srcb=document.getElementById("btnSolRechaz");if(srcb)srcb.addEventListener("click",rechazarOpen);
+  var sdcb=document.getElementById("btnSolDesc");if(sdcb)sdcb.addEventListener("click",descartarOpen);
+  var sfcb=document.getElementById("btnSolForzar");if(sfcb)sfcb.addEventListener("click",sendForzarCierre);
+  var sdesc=document.getElementById("solDesc");if(sdesc)sdesc.addEventListener("input",function(e){S.sol.crear.descripcion=e.target.value;});
+
+  document.querySelectorAll("[data-soltab]").forEach(function(el){el.addEventListener("click",function(){setSolTab(el.dataset.soltab);});});
+  document.querySelectorAll("[data-solver]").forEach(function(el){el.addEventListener("click",function(){solVer(el.dataset.solver);});});
+  document.querySelectorAll("[data-prio]").forEach(function(el){el.addEventListener("click",function(){solCrearPrioridad(el.dataset.prio);});});
+  document.querySelectorAll("[data-parada]").forEach(function(el){el.addEventListener("click",function(){solCrearParada(el.dataset.parada);});});
+
+  // AVANCE
+  var avc=document.getElementById("btnAvanceCerrar");if(avc)avc.addEventListener("click",avanceClose);
+  var ave=document.getElementById("btnAvanceEnviar");if(ave)ave.addEventListener("click",sendCrearAvance);
+  var avAct=document.getElementById("avActividades");if(avAct)avAct.addEventListener("input",function(e){S.sol.avance.actividades=e.target.value;});
+  var avHor=document.getElementById("avHoras");if(avHor)avHor.addEventListener("input",function(e){S.sol.avance.horas=e.target.value;});
+  var avCie=document.getElementById("avEsCierre");if(avCie)avCie.addEventListener("change",function(){avanceToggleCierre();});
+  document.querySelectorAll("[data-avtipo]").forEach(function(el){el.addEventListener("click",function(){avanceTipo(el.dataset.avtipo);});});
+  document.querySelectorAll("[data-avsub]").forEach(function(el){el.addEventListener("click",function(){avanceSubtipo(el.dataset.avsub);});});
+
+  // DESCARTAR
+  var dcc=document.getElementById("btnDescCerrar");if(dcc)dcc.addEventListener("click",descartarClose);
+  var dce=document.getElementById("btnDescEnviar");if(dce)dce.addEventListener("click",sendDescartarSolicitud);
+  var dcm=document.getElementById("descMotivo");if(dcm)dcm.addEventListener("input",function(e){S.sol.descartar.motivo=e.target.value;});
+
+  // RECHAZAR
+  var rcc=document.getElementById("btnRechCerrar");if(rcc)rcc.addEventListener("click",rechazarClose);
+  var rce=document.getElementById("btnRechEnviar");if(rce)rce.addEventListener("click",sendRechazarSolicitud);
+  var rcm=document.getElementById("rechMotivo");if(rcm)rcm.addEventListener("input",function(e){S.sol.rechazar.motivo=e.target.value;});
+
+  // MÁQUINAS, OPERACIONES, PARTES (globales)
   document.querySelectorAll("[data-maq]").forEach(function(el){el.addEventListener("click",function(){setMaq(el.dataset.ns,el.dataset.maq);});});
   document.querySelectorAll("[data-op]").forEach(function(el){el.addEventListener("click",function(){setOp(el.dataset.ns,el.dataset.op);});});
-  document.querySelectorAll("[data-manto]").forEach(function(el){el.addEventListener("click",function(){selManto(el.dataset.manto);});});
-  document.querySelectorAll("[data-mantoedit]").forEach(function(el){el.addEventListener("click",function(){selMantoEdit(el.dataset.mantoedit);});});
   document.querySelectorAll("[data-del]").forEach(function(el){el.addEventListener("click",function(){delPartida(parseInt(el.dataset.del));});});
   document.querySelectorAll("[data-parte]").forEach(function(el){el.addEventListener("click",function(){selParte(el.dataset.ns,el.dataset.parte);});});
   document.querySelectorAll("[data-search]").forEach(function(el){
@@ -671,6 +1364,7 @@ function bindMain(){
   document.querySelectorAll("[data-ot]").forEach(function(el){el.addEventListener("input",function(){S.prod.partidas[parseInt(el.dataset.ot)].ot=el.value;});});
   document.querySelectorAll("[data-desc]").forEach(function(el){el.addEventListener("input",function(){S.prod.partidas[parseInt(el.dataset.desc)].desc=el.value;});});
 }
+
 function updateResults(ns,q){
   var PART_LIST=["Otro"].concat(Object.keys(CAT.partes).sort());
   var ql=q.toLowerCase(),lista=q.length>1?PART_LIST.filter(function(p){return p.toLowerCase().indexOf(ql)>=0;}).slice(0,15):[];
@@ -684,6 +1378,11 @@ function updateResults(ns,q){
   div.innerHTML=html;
   div.querySelectorAll("[data-parte]").forEach(function(el){el.addEventListener("click",function(){selParte(el.dataset.ns,el.dataset.parte);});});
 }
+
+// ============================================================
+// ENVIOS PRODUCCION/SETUP/MANTO
+// ============================================================
+
 function sendProd(){
   if(!S.prod.maquina){alert("Selecciona una maquina.");return;}
   if(!S.prod.partidas[0].noParte){alert("Selecciona al menos un numero de parte.");return;}
@@ -700,6 +1399,7 @@ function sendProd(){
     S.prod={maquina:"",partidas:[mkPartida()]};S.miturno.data=null;S.sending=false;S.view="done";render();
   });
 }
+
 function sendSetup(){
   if(!S.setup.maquina){alert("Selecciona una maquina.");return;}
   if(!S.setup.noParte){alert("Selecciona un numero de parte.");return;}
@@ -714,22 +1414,45 @@ function sendSetup(){
     S.setup={maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""};S.miturno.data=null;S.sending=false;S.view="done";render();
   });
 }
+
 function sendManto(){
   if(!S.manto.maquina){alert("Selecciona una maquina.");return;}
   if(!S.manto.tipo){alert("Selecciona un tipo de mantenimiento.");return;}
+  if(S.manto.tipo==="Emergencia"&&tiposMantoSub("Emergencia").length&&!S.manto.subtipo){alert("Selecciona subcategoria de Emergencia.");return;}
   S.sending=true;render();
   var fecha=getFecha(),hora=getHora();
-  enviar({fecha:fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:S.empleado.numero+" - "+S.empleado.nombre,noParte:"",ordenTrabajo:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion})
+  var tipoFinal=S.manto.tipo==="Emergencia"&&S.manto.subtipo?"Emergencia - "+S.manto.subtipo:S.manto.tipo;
+  enviar({fecha:fecha,turno:S.turno,tipo:"Mantenimiento",maquina:S.manto.maquina,responsable:S.empleado.numero+" - "+S.empleado.nombre,noParte:"",ordenTrabajo:"",tipoOperacion:"",operacion:"",piezas:"",horasSetup:"",horasManto:S.manto.horas,tipoManto:tipoFinal,descripcion:S.manto.descripcion})
   .then(function(){
     S.history.unshift({tipo:"Mantenimiento",fecha:fecha,hora:hora,turno:S.turno,maquina:S.manto.maquina});
-    S.submitted={tipo:"Mantenimiento",fecha:fecha,hora:hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:S.manto.tipo,descripcion:S.manto.descripcion,horas:S.manto.horas};
-    S.manto={maquina:"",tipo:"",descripcion:"",horas:""};S.miturno.data=null;S.sending=false;S.view="done";render();
+    S.submitted={tipo:"Mantenimiento",fecha:fecha,hora:hora,turno:S.turno,maquina:S.manto.maquina,tipoManto:tipoFinal,descripcion:S.manto.descripcion,horas:S.manto.horas};
+    S.manto={maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""};S.miturno.data=null;S.sending=false;S.view="done";render();
   });
 }
 
-Promise.all([fetchCat("empleados"),fetchCat("operaciones"),fetchCat("partes"),fetchCat("tiposmanto")])
-  .then(function(results){CAT={empleados:results[0],operaciones:results[1],partes:results[2],tiposmanto:results[3]};S.view="login";render();})
-  .catch(function(){document.getElementById("app").innerHTML='<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catalogos. Verifica conexion.</div>';});
+// ============================================================
+// INICIALIZACION
+// ============================================================
+
+Promise.all([
+  fetchCat("empleados"),
+  fetchCat("operaciones"),
+  fetchCat("partes"),
+  fetchCat("tiposmanto"),
+  fetchCat("maquinas")
+]).then(function(results){
+  CAT={
+    empleados:results[0]||[],
+    operaciones:results[1]||[],
+    partes:results[2]||{},
+    tiposmanto:results[3]||{principales:TIPOS_MANTO_DEFAULT,sub:{}},
+    maquinas:results[4]||[]
+  };
+  S.view="login";render();
+}).catch(function(err){
+  document.getElementById("app").innerHTML='<div style="padding:2rem;text-align:center;color:#E24B4A;font-size:16px">Error al cargar catalogos. Verifica conexion.<br><span style="font-size:12px">'+(err&&err.message?err.message:"")+'</span></div>';
+});
+
 </script>
 </body>
 </html>
