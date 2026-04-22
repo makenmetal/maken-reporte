@@ -1205,10 +1205,10 @@ function buildSolDetalle(){
   var puedeAceptarEsta=puedeAceptar&&!soyElQueCerro&&s.estado==="Cierre propuesto";
   var puedeRechazarEsta=puedeAceptar&&!soyElQueCerro&&s.estado==="Cierre propuesto";
   var puedeAvanzar=emp.esManto&&s.estado!=="Aceptada"&&s.estado!=="Descartada";
-  var puedeDescartar=emp.esManto&&(s.estado==="Abierta"||s.estado==="En proceso");
+  var puedeDescartar=emp.esManto&&(s.estado==="Abierta"||s.estado==="En proceso")&&avances.length===0;
   var estaCerrada=s.estado==="Aceptada"||s.estado==="Descartada";
 
-  var puedeEditarClasif=(emp.esManto||S.esDueno||emp.puedeAceptar)&&s.estado!=="Descartada";
+  var puedeEditarClasif=(emp.esManto||S.esDueno)&&s.estado!=="Descartada";
   var clasifActual=s.clasificacion?String(s.clasificacion):"";
   var clasifBox='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 12px;background:'+(clasifActual?"#E1F5EE":"#FAEEDA")+';border-radius:10px">'
     +'<div><span style="font-size:12px;color:#666">Clasificación</span><br><strong style="font-size:14px;color:'+(clasifActual?"#1D9E75":"#BA7517")+'">'+(clasifActual||"Sin asignar")+'</strong></div>'
