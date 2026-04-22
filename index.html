@@ -303,9 +303,17 @@ function cargarMiTurno(){
 }
 function cargarSolicitudes(){
   S.sol.loading=true;render();
-  var filtro=S.sol.subTab==="cerradas"?"cerradas":"activas";
-  var params={action:"listSolicitudes",filtro:filtro};
-  if(S.sol.subTab==="mias"){params.filtro="del_usuario";params.empleado=S.empleado.numero;}
+  var sub=S.sol.subTab;
+  var params={action:"listSolicitudes"};
+  if(sub==="mias"){
+    params.filtro="del_usuario";params.empleado=S.empleado.numero;
+  }else if(sub==="cerradas"){
+    // Cerradas: todas las del sistema, últimas 10
+    params.filtro="cerradas";params.limite="10";
+  }else{
+    // activas, cola_manto, por_aceptar, todas
+    params.filtro="activas";
+  }
   apiGetManto(params)
     .then(function(d){S.sol.data=d||[];S.sol.loading=false;render();})
     .catch(function(){S.sol.data=[];S.sol.loading=false;render();});
@@ -471,7 +479,7 @@ function sendRechazarSolicitud(){
   var id=S.sol.viendo,motivo=S.sol.rechazar.motivo;
   if(!motivo||motivo.trim().length<5){alert("Describe el motivo del rechazo.");return;}
   S.sending=true;render();
-  apiGetManto({action:"rechazarSolicitud",idSolicitud:id,motivo:motivo})
+  apiGetManto({action:"rechazarSolicitud",idSolicitud:id,motivo:motivo,rechazadoPor:S.empleado.numero+" - "+S.empleado.nombre})
     .then(function(res){
       S.sending=false;
       if(res.ok){
@@ -502,7 +510,7 @@ function sendForzarCierre(){
   var id=S.sol.viendo;
   if(!confirm("Forzar cierre como DUEÑO de "+id+"?"))return;
   S.sending=true;render();
-  apiGetManto({action:"forzarCierre",idSolicitud:id})
+  apiGetManto({action:"forzarCierre",idSolicitud:id,empleado:S.empleado.numero})
     .then(function(res){
       S.sending=false;
       if(res.ok){cargarDetalleSolicitud(id);}
@@ -516,7 +524,7 @@ function sendEditarClasificacion(){
   if(tipoTieneSub(e.tipo)&&!e.subtipo){alert("Selecciona subcategoria.");return;}
   var clasFinal=e.subtipo?(e.tipo+" - "+e.subtipo):e.tipo;
   S.sending=true;render();
-  apiGetManto({action:"editarClasificacion",idSolicitud:id,clasificacion:clasFinal})
+  apiGetManto({action:"editarClasificacion",idSolicitud:id,clasificacion:clasFinal,empleado:S.empleado.numero})
     .then(function(res){
       S.sending=false;
       if(res.ok){
@@ -586,7 +594,7 @@ function setTab(t){
   if(t==="miturno"&&!S.miturno.data)cargarMiTurno();
   else if(t==="solicitudes"){
     // Seleccionar subTab por defecto según rol
-    if(!S.sol.subTab||S.sol.subTab==="cerradas"){
+    if(!S.sol.subTab||S.sol.subTab==="cerradas_mias"||S.sol.subTab==="cerradas_todas"){
       if(S.empleado&&S.empleado.esManto)S.sol.subTab="cola_manto";
       else if(S.empleado&&S.empleado.puedeAceptar)S.sol.subTab="por_aceptar";
       else S.sol.subTab="mias";
@@ -1126,7 +1134,8 @@ function buildMain(){
     tabsArr.push({id:"produccion",label:"Produccion"});
     tabsArr.push({id:"setup",label:"Setup"});
   }
-  tabsArr.push({id:"manto",label:"Manto"});
+  // Tab Manto solo para jefe de manto y dueño (reporta horas reales de máquina parada)
+  if(emp.esManto||S.esDueno)tabsArr.push({id:"manto",label:"Manto"});
   tabsArr.push({id:"solicitudes",label:"Solicitudes"});
   tabsArr.push({id:"miturno",label:"Mi turno"});
 
@@ -1199,6 +1208,7 @@ function buildSolLista(){
   // Filtrado en cliente según subTab (el servidor ya filtra básico, aquí afinamos)
   var rows=S.sol.data||[];
   var filtrado=rows.slice();
+  var avisoLimite="";
   if(sub==="por_aceptar"){
     filtrado=filtrado.filter(function(s){return s.estado==="Cierre propuesto";});
   }else if(sub==="cola_manto"){
@@ -1209,6 +1219,11 @@ function buildSolLista(){
     filtrado=filtrado.filter(function(s){return s.estado!=="Aceptada"&&s.estado!=="Descartada";});
   }else if(sub==="todas"){
     filtrado=filtrado.filter(function(s){return s.estado!=="Aceptada"&&s.estado!=="Descartada";});
+  }else if(sub==="cerradas"){
+    // Aviso cuando llegó al límite
+    if(filtrado.length>=10){
+      avisoLimite='<div style="font-size:12px;color:#888;padding:8px 12px;background:#f0f0f0;border-radius:8px;margin-bottom:10px;text-align:center">Mostrando las 10 más recientes. Consulta el Sheet para histórico completo.</div>';
+    }
   }
 
   var listaHtml=S.sol.loading?'<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
@@ -1233,7 +1248,7 @@ function buildSolLista(){
   return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
     +'<span style="font-size:16px;font-weight:600">Solicitudes de mantenimiento</span>'
     +refreshBtn+'</div>'
-    +subTabsHtml+btnNueva+btnDirecta+listaHtml;
+    +subTabsHtml+btnNueva+btnDirecta+avisoLimite+listaHtml;
 }
 
 function buildSolCrear(){
@@ -1283,9 +1298,15 @@ function buildSolDetalle(){
 
   var puedeEditarClasif=(emp.esManto||S.esDueno)&&s.estado!=="Descartada";
   var clasifActual=s.clasificacion?String(s.clasificacion):"";
-  var clasifBox='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 12px;background:'+(clasifActual?"#E1F5EE":"#FAEEDA")+';border-radius:10px">'
-    +'<div><span style="font-size:12px;color:#666">Clasificación</span><br><strong style="font-size:14px;color:'+(clasifActual?"#1D9E75":"#BA7517")+'">'+(clasifActual||"Sin asignar")+'</strong></div>'
-    +(puedeEditarClasif?'<button style="font-size:12px;color:#185FA5;background:none;border:1px solid #185FA5;border-radius:8px;padding:6px 12px;cursor:pointer" id="btnEditClasif">'+(clasifActual?"Editar":"Asignar")+'</button>':'')
+  // FIX #1: destacar visualmente cuando falta clasificación y ya está en Cierre propuesto
+  var faltaClasifCritica=!clasifActual&&s.estado==="Cierre propuesto";
+  var bgClasif=clasifActual?"#E1F5EE":(faltaClasifCritica?"#FBE5E5":"#FAEEDA");
+  var colorClasif=clasifActual?"#1D9E75":(faltaClasifCritica?"#E24B4A":"#BA7517");
+  var borderClasif=faltaClasifCritica?"border:2px solid #E24B4A;":"";
+  var textoClasif=clasifActual||(faltaClasifCritica?"⚠ Falta asignar clasificación":"Sin asignar");
+  var clasifBox='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 12px;background:'+bgClasif+';border-radius:10px;'+borderClasif+'">'
+    +'<div><span style="font-size:12px;color:#666">Clasificación</span><br><strong style="font-size:14px;color:'+colorClasif+'">'+textoClasif+'</strong></div>'
+    +(puedeEditarClasif?'<button style="font-size:12px;color:'+(faltaClasifCritica?"#E24B4A":"#185FA5")+';background:none;border:1px solid '+(faltaClasifCritica?"#E24B4A":"#185FA5")+';border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:'+(faltaClasifCritica?"700":"400")+'" id="btnEditClasif">'+(clasifActual?"Editar":"Asignar")+'</button>':'')
     +'</div>';
 
   var infoSol='<div class="card">'
