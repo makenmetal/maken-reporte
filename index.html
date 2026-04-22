@@ -136,6 +136,7 @@ var S = {
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
   resumen:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
+  resumenManto:{loading:false,data:null},
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
   // Solicitudes
   sol:{
@@ -149,7 +150,8 @@ var S = {
     avance:{horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false},
     descartar:{showing:false,motivo:""},
     rechazar:{showing:false,motivo:""},
-    editClasif:{showing:false,tipo:"",subtipo:""}
+    editClasif:{showing:false,tipo:"",subtipo:""},
+    directa:{showing:false,maquina:"",tipo:"",subtipo:"",actividades:"",horas:""}
   },
   // Panel dueño - ver reportes operador
   verOp:{empleadoSel:"",fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null}
@@ -272,10 +274,13 @@ function fetchCatManto(a){
 // ============================================================
 
 function cargarResumen(){
-  S.resumen.loading=true;render();
+  S.resumen.loading=true;S.resumenManto.loading=true;render();
   apiGet({action:"reportes",fecha:S.resumen.fecha,turno:S.resumen.turno})
     .then(function(d){S.resumen.data=d;S.resumen.loading=false;render();})
     .catch(function(){S.resumen.data=[];S.resumen.loading=false;render();});
+  apiGetManto({action:"resumenManto",fecha:S.resumen.fecha,turno:S.resumen.turno})
+    .then(function(d){S.resumenManto.data=d;S.resumenManto.loading=false;render();})
+    .catch(function(){S.resumenManto.data=null;S.resumenManto.loading=false;render();});
 }
 function cargarMiTurno(){
   S.miturno.loading=true;render();
@@ -508,6 +513,32 @@ function sendEditarClasificacion(){
     }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
 }
 
+function sendCrearActividadDirecta(){
+  var d=S.sol.directa;
+  if(!d.maquina){alert("Selecciona una maquina.");return;}
+  if(!d.tipo){alert("Selecciona clasificacion.");return;}
+  if(d.tipo==="Emergencia"&&!d.subtipo){alert("Selecciona subcategoria de Emergencia.");return;}
+  if(!d.actividades||d.actividades.trim().length<5){alert("Describe las actividades realizadas.");return;}
+  if(!d.horas||parseFloat(d.horas)<=0){alert("Indica horas invertidas.");return;}
+  var clasFinal=d.tipo==="Emergencia"?("Emergencia - "+d.subtipo):d.tipo;
+  S.sending=true;render();
+  apiGetManto({
+    action:"crearActividadDirecta",
+    maquina:d.maquina,
+    tecnico:S.empleado.numero+" - "+S.empleado.nombre,
+    clasificacion:clasFinal,
+    actividades:d.actividades,
+    horas:d.horas
+  }).then(function(res){
+    S.sending=false;
+    if(res.ok){
+      alert("Actividad registrada: "+res.id);
+      S.sol.directa={showing:false,maquina:"",tipo:"",subtipo:"",actividades:"",horas:""};
+      cargarSolicitudes();
+    }else{alert("Error: "+(res.error||"intenta de nuevo"));render();}
+  }).catch(function(){S.sending=false;alert("Error de conexion.");render();});
+}
+
 // ============================================================
 // LOGIN Y NAVEGACION
 // ============================================================
@@ -561,6 +592,7 @@ function setMaq(ns,maq){
   else if(ns==="manto"){S.manto.maquina=maq;}
   else if(ns==="edit"){S.editando.maquina=maq;S.editando.operacion="";}
   else if(ns==="solcrear"){S.sol.crear.maquina=maq;}
+  else if(ns==="directa"){S.sol.directa.maquina=maq;}
   render();
 }
 function setOp(ns,op){
@@ -591,7 +623,7 @@ function solCrearParada(v){S.sol.crear.maquinaParada=v;render();}
 function solCrearOpen(){S.sol.crear.showing=true;render();}
 function solCrearClose(){S.sol.crear={maquina:"",prioridad:"",maquinaParada:"",descripcion:"",showing:false};render();}
 function solVer(id){cargarDetalleSolicitud(id);}
-function solVolver(){S.sol.viendo=null;S.sol.detalle=null;S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};S.sol.descartar={showing:false,motivo:""};S.sol.rechazar={showing:false,motivo:""};S.sol.editClasif={showing:false,tipo:"",subtipo:""};cargarSolicitudes();}
+function solVolver(){S.sol.viendo=null;S.sol.detalle=null;S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};S.sol.descartar={showing:false,motivo:""};S.sol.rechazar={showing:false,motivo:""};S.sol.editClasif={showing:false,tipo:"",subtipo:""};S.sol.directa={showing:false,maquina:"",tipo:"",subtipo:"",actividades:"",horas:""};cargarSolicitudes();}
 function avanceOpen(){S.sol.avance.showing=true;render();}
 function avanceClose(){S.sol.avance={horas:"",tipo:"",subtipo:"",actividades:"",esCierre:false,showing:false};render();}
 function avanceTipo(t){S.sol.avance.tipo=t;if(t!=="Emergencia")S.sol.avance.subtipo="";render();}
@@ -613,6 +645,10 @@ function editClasifOpen(){
 function editClasifClose(){S.sol.editClasif={showing:false,tipo:"",subtipo:""};render();}
 function editClasifTipo(t){S.sol.editClasif.tipo=t;if(t!=="Emergencia")S.sol.editClasif.subtipo="";render();}
 function editClasifSubtipo(t){S.sol.editClasif.subtipo=t;render();}
+function directaOpen(){S.sol.directa={showing:true,maquina:"",tipo:"",subtipo:"",actividades:"",horas:""};render();}
+function directaClose(){S.sol.directa={showing:false,maquina:"",tipo:"",subtipo:"",actividades:"",horas:""};render();}
+function directaTipo(t){S.sol.directa.tipo=t;if(t!=="Emergencia")S.sol.directa.subtipo="";render();}
+function directaSubtipo(t){S.sol.directa.subtipo=t;render();}
 
 // ============================================================
 // RENDER
@@ -724,9 +760,26 @@ function buildResumen(){
         +mkResumenCard("PIEZAS",totalPiezas,"#1D9E75")
         +mkResumenCard("HRS SETUP",totalSetup.toFixed(1),"#185FA5")
         +mkResumenCard("HRS MANTO",totalManto.toFixed(1),"#BA7517")
-        +'</div>'+estadoHTML+detalleHTML)
+        +'</div>'+buildResumenManto()+estadoHTML+detalleHTML)
     +verOpSection
     +'</div>';
+}
+
+function buildResumenManto(){
+  var rm=S.resumenManto;
+  if(rm.loading)return'<div class="card" style="margin-bottom:16px;padding:1rem"><p style="font-size:12px;color:#888;font-weight:500;margin-bottom:8px">MANTO DEL TURNO</p><p style="color:#888;font-size:13px;text-align:center">Cargando...</p></div>';
+  if(!rm.data)return"";
+  var d=rm.data;
+  var cards='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">'
+    +'<div style="background:#fff;border-radius:10px;padding:10px 6px;text-align:center;border:1px solid #eee"><p style="font-size:10px;color:#888;margin-bottom:2px">SOLICIT.</p><p style="font-size:20px;font-weight:700;color:#1D9E75">'+(d.solicitudesTurno-d.directasTurno)+'</p></div>'
+    +'<div style="background:#fff;border-radius:10px;padding:10px 6px;text-align:center;border:1px solid #eee"><p style="font-size:10px;color:#888;margin-bottom:2px">DIRECTAS</p><p style="font-size:20px;font-weight:700;color:#BA7517">'+d.directasTurno+'</p></div>'
+    +'<div style="background:#fff;border-radius:10px;padding:10px 6px;text-align:center;border:1px solid #eee"><p style="font-size:10px;color:#888;margin-bottom:2px">TMI</p><p style="font-size:20px;font-weight:700;color:#185FA5">'+d.tmiTotal.toFixed(1)+'</p></div>'
+    +'<div style="background:#fff;border-radius:10px;padding:10px 6px;text-align:center;border:1px solid #eee"><p style="font-size:10px;color:#888;margin-bottom:2px">TMP</p><p style="font-size:20px;font-weight:700;color:#E24B4A">'+d.tmpTotal.toFixed(1)+'</p></div>'
+    +'</div>';
+  var abiertas=d.solicitadasAbiertas>0?'<div style="font-size:13px;color:#BA7517;font-weight:600;margin-bottom:6px">⚠ '+d.solicitadasAbiertas+' solicitud(es) pendiente(s) sin cerrar</div>':"";
+  var top=d.topMaquinas.length?'<div style="margin-top:6px"><p style="font-size:11px;color:#888;margin-bottom:4px">TOP MÁQUINAS</p>'+d.topMaquinas.map(function(m){return'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+m.maquina+'</span><span style="font-weight:600">'+m.count+'</span></div>';}).join("")+'</div>':"";
+  var clasif=d.porClasificacion.length?'<div style="margin-top:6px"><p style="font-size:11px;color:#888;margin-bottom:4px">POR CLASIFICACIÓN</p>'+d.porClasificacion.map(function(c){return'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+c.clasif+'</span><span style="font-weight:600">'+c.count+'</span></div>';}).join("")+'</div>':"";
+  return'<div class="card" style="margin-bottom:16px"><p style="font-size:12px;color:#888;font-weight:500;margin-bottom:8px">MANTO DEL TURNO</p>'+cards+abiertas+top+clasif+'</div>';
 }
 
 function buildVerOpLista(){
@@ -974,10 +1027,10 @@ function bindDone(){
 // ============================================================
 
 function buildMaquinas(ns){
-  var sel=ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:ns==="manto"?S.manto.maquina:ns==="solcrear"?S.sol.crear.maquina:"";
+  var sel=ns==="prod"?S.prod.maquina:ns==="setup"?S.setup.maquina:ns==="manto"?S.manto.maquina:ns==="solcrear"?S.sol.crear.maquina:ns==="directa"?S.sol.directa.maquina:"";
   var html="";
-  // Para manto y solcrear usamos TODAS las máquinas (incluye secundarias)
-  var areas=(ns==="manto"||ns==="solcrear")?areasTodas():areasPrincipales();
+  // Para manto, solcrear y directa usamos TODAS las máquinas (incluye secundarias)
+  var areas=(ns==="manto"||ns==="solcrear"||ns==="directa")?areasTodas():areasPrincipales();
   areas.forEach(function(a){
     var cols=Math.min(a.maquinas.length,2);
     html+='<p class="area-label">'+a.area+'</p><div class="btn-grid" style="grid-template-columns:repeat('+cols+',1fr)">';
@@ -1097,6 +1150,7 @@ function estadoPillClass(estado){
 
 function buildSolicitudes(){
   if(S.sol.crear.showing)return buildSolCrear();
+  if(S.sol.directa.showing)return buildActividadDirectaForm();
   if(S.sol.viendo&&(S.sol.detalleLoading||S.sol.detalle))return buildSolDetalle();
   return buildSolLista();
 }
@@ -1125,6 +1179,12 @@ function buildSolLista(){
     btnNueva='<button class="send-btn" style="background:#1D9E75;margin-bottom:14px" id="btnSolNueva">+ Nueva solicitud</button>';
   }
 
+  // Botón registrar actividad directa (solo manto y dueño)
+  var btnDirecta="";
+  if(emp.esManto||S.esDueno){
+    btnDirecta='<button class="send-btn" style="background:#BA7517;margin-bottom:14px" id="btnSolDirecta">+ Registrar actividad directa</button>';
+  }
+
   var refreshBtn='<button class="refresh-btn" id="btnSolRefresh" style="margin-left:8px">↻</button>';
 
   // Filtrado en cliente según subTab (el servidor ya filtra básico, aquí afinamos)
@@ -1133,7 +1193,8 @@ function buildSolLista(){
   if(sub==="por_aceptar"){
     filtrado=filtrado.filter(function(s){return s.estado==="Cierre propuesto";});
   }else if(sub==="cola_manto"){
-    filtrado=filtrado.filter(function(s){return s.estado==="Abierta"||s.estado==="En proceso";});
+    // Cola manto: solo solicitudes pendientes de trabajo, nunca directas (nacen cerradas)
+    filtrado=filtrado.filter(function(s){return (s.estado==="Abierta"||s.estado==="En proceso")&&s.origen!=="Directa";});
   }else if(sub==="mias"){
     // Server ya filtró por usuario, pero puede traer cerradas — quitamos
     filtrado=filtrado.filter(function(s){return s.estado!=="Aceptada"&&s.estado!=="Descartada";});
@@ -1146,13 +1207,16 @@ function buildSolLista(){
     :filtrado.map(function(s){
       var cls=s.prioridad==="Urgente"?"urgente":"normal";
       var estClass=estadoPillClass(s.estado);
-      return'<div class="card sol-card '+cls+'" data-solver="'+s.id+'" style="cursor:pointer">'
+      var esDirecta=s.origen==="Directa";
+      var badgeDirecta=esDirecta?'<span style="font-size:10px;font-weight:700;color:#fff;background:#BA7517;padding:2px 8px;border-radius:8px;margin-right:6px">DIRECTA</span>':"";
+      return'<div class="card sol-card '+(esDirecta?"cerrada":cls)+'" data-solver="'+s.id+'" style="cursor:pointer">'
         +'<div class="sol-header">'
-        +'<div style="flex:1"><div class="sol-id">'+s.id+'</div>'
+        +'<div style="flex:1">'+badgeDirecta+'<span class="sol-id">'+s.id+'</span>'
         +'<div style="font-size:15px;font-weight:600;margin-top:2px">'+s.maquina+'</div>'
         +'<div style="font-size:12px;color:#888;margin-top:2px">'+s.fecha+' · '+s.turno+' · '+(String(s.solicitante||"").split(" - ")[0])+'</div></div>'
-        +'<div style="text-align:right"><span class="pill estado-'+cls+'" style="background:'+(s.prioridad==="Urgente"?"#FBE5E5":"#E6F1FB")+';color:'+(s.prioridad==="Urgente"?"#E24B4A":"#185FA5")+'">'+s.prioridad+'</span>'
-        +'<br><span class="estado-pill '+estClass+'">'+s.estado+'</span></div></div>'
+        +'<div style="text-align:right">'
+        +(esDirecta?'':'<span class="pill estado-'+cls+'" style="background:'+(s.prioridad==="Urgente"?"#FBE5E5":"#E6F1FB")+';color:'+(s.prioridad==="Urgente"?"#E24B4A":"#185FA5")+'">'+s.prioridad+'</span><br>')
+        +'<span class="estado-pill '+estClass+'">'+s.estado+'</span></div></div>'
         +'<div style="font-size:13px;color:#555;margin-top:8px">'+(s.descripcion||"").substring(0,100)+(String(s.descripcion||"").length>100?"...":"")+'</div>'
         +'</div>';
     }).join("");
@@ -1160,7 +1224,7 @@ function buildSolLista(){
   return'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
     +'<span style="font-size:16px;font-weight:600">Solicitudes de mantenimiento</span>'
     +refreshBtn+'</div>'
-    +subTabsHtml+btnNueva+listaHtml;
+    +subTabsHtml+btnNueva+btnDirecta+listaHtml;
 }
 
 function buildSolCrear(){
@@ -1338,6 +1402,29 @@ function buildEditClasifForm(){
     +'<button class="send-btn" style="background:#1D9E75" id="btnEditClasifEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Guardando...":"Guardar clasificación")+'</button>';
 }
 
+function buildActividadDirectaForm(){
+  var d=S.sol.directa;
+  var btns=tiposMantoPrincipales().map(function(t){return'<button class="big-btn'+(d.tipo===t?" active":"")+'\" data-dtipo="'+t+'">'+t+'</button>';}).join("");
+  var subBox="";
+  if(d.tipo==="Emergencia"){
+    var subs=tiposMantoSub("Emergencia");
+    if(subs.length){
+      var sbtns=subs.map(function(t){return'<button class="big-btn'+(d.subtipo===t?" active":"")+'\" data-dsub="'+t+'">'+t+'</button>';}).join("");
+      subBox='<div class="sub-cat-box"><label>Subcategoria de Emergencia</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+sbtns+'</div></div>';
+    }
+  }
+  return'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-weight:600;font-size:16px">Registrar actividad directa</span>'
+    +'<button style="font-size:13px;color:#888;background:none;border:none;cursor:pointer" id="btnDirectaCerrar">Cancelar</button></div>'
+    +'<p style="font-size:13px;color:#666;margin-bottom:10px">Registra directamente un trabajo de mantenimiento sin pasar por una solicitud formal. Queda cerrada automáticamente.</p>'
+    +'<div class="section"><label>Máquina</label>'+buildMaquinas("directa")+'</div>'
+    +'<div class="field"><label>Clasificación</label><div class="btn-grid" style="grid-template-columns:repeat(2,1fr)">'+btns+'</div>'+subBox+'</div>'
+    +'<div class="field"><label>Actividades realizadas</label><textarea id="dirActividades" placeholder="Describe qué se hizo en la máquina...">'+d.actividades+'</textarea></div>'
+    +'<div class="field"><label>Horas invertidas</label><input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="dirHoras" value="'+d.horas+'" step="0.5"></div>'
+    +'</div>'
+    +'<button class="send-btn" style="background:#BA7517" id="btnDirectaEnviar"'+(S.sending?" disabled":"")+'>'+(S.sending?"Registrando...":"Registrar actividad")+'</button>';
+}
+
 // ============================================================
 // BINDINGS
 // ============================================================
@@ -1422,6 +1509,15 @@ function bindMain(){
   var ece=document.getElementById("btnEditClasifEnviar");if(ece)ece.addEventListener("click",sendEditarClasificacion);
   document.querySelectorAll("[data-ectipo]").forEach(function(el){el.addEventListener("click",function(){editClasifTipo(el.dataset.ectipo);});});
   document.querySelectorAll("[data-ecsub]").forEach(function(el){el.addEventListener("click",function(){editClasifSubtipo(el.dataset.ecsub);});});
+
+  // ACTIVIDAD DIRECTA
+  var dio=document.getElementById("btnSolDirecta");if(dio)dio.addEventListener("click",directaOpen);
+  var dic=document.getElementById("btnDirectaCerrar");if(dic)dic.addEventListener("click",directaClose);
+  var die=document.getElementById("btnDirectaEnviar");if(die)die.addEventListener("click",sendCrearActividadDirecta);
+  var diAct=document.getElementById("dirActividades");if(diAct)diAct.addEventListener("input",function(e){S.sol.directa.actividades=e.target.value;});
+  var diHor=document.getElementById("dirHoras");if(diHor)diHor.addEventListener("input",function(e){S.sol.directa.horas=e.target.value;});
+  document.querySelectorAll("[data-dtipo]").forEach(function(el){el.addEventListener("click",function(){directaTipo(el.dataset.dtipo);});});
+  document.querySelectorAll("[data-dsub]").forEach(function(el){el.addEventListener("click",function(){directaSubtipo(el.dataset.dsub);});});
 
   // MÁQUINAS, OPERACIONES, PARTES (globales)
   document.querySelectorAll("[data-maq]").forEach(function(el){el.addEventListener("click",function(){setMaq(el.dataset.ns,el.dataset.maq);});});
