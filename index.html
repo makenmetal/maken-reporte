@@ -81,7 +81,7 @@ textarea { resize: vertical; min-height: 90px; font-size: 16px; }
 <body>
 <div id="app" class="wrap"><div class="spinner">Cargando catalogos...</div></div>
 <script>
-var SHEETS_URL = "https://script.google.com/macros/s/AKfycbwBZ4Td2cjH3CbrESY8PVBIop3mcbOtVQrwqN51pjMCKp47YEs4og2uOd-s3ZQ-kLUwUg/exec";
+var SHEETS_URL = "https://script.google.com/macros/s/AKfycbw4gJ6wTPjJ33CiBVwiiIiUmNdZb1BOpSKohhpYSCxMn5RooH7veSotxG858veC5elrzQ/exec";
 // *** PEGAR aquí la URL de deployment del Apps Script de MANTO (Sheet separado) ***
 var SHEETS_MANTO_URL = "https://script.google.com/macros/s/AKfycbz0YmVWtmUTNOMspYX0FkqmID38dCeBR4fKR9MAErWUdPaxtRTywn5jmrzaWoQearwT/exec";
 var OWNER_PIN = "9473";
@@ -568,7 +568,7 @@ function doLogin(val){
   var str=String(val).trim();
   if(str===OWNER_PIN){
     S.esDueno=true;
-    S.empleado={numero:"9473",nombre:"Dueño",puedeSolicitar:true,puedeAceptar:true,esManto:true};
+    S.empleado={numero:"9473",nombre:"Dueño",puedeSolicitar:true,puedeAceptar:true,esManto:true,puedeReportarManto:true};
     S.view="resumen";cargarResumen();render();return;
   }
   var n=parseInt(str),emp=null;
@@ -1136,7 +1136,8 @@ function buildMain(){
     tabsArr.push({id:"setup",label:"Setup"});
   }
   // Tab Manto solo para jefe de manto y dueño (reporta horas reales de máquina parada)
-  if(emp.esManto||S.esDueno)tabsArr.push({id:"manto",label:"Manto"});
+  // Tab Manto: jefe de manto, dueño, o supervisor con permiso de reportar manto
+  if(emp.esManto||S.esDueno||emp.puedeReportarManto)tabsArr.push({id:"manto",label:"Manto"});
   tabsArr.push({id:"solicitudes",label:"Solicitudes"});
   tabsArr.push({id:"miturno",label:"Mi turno"});
 
