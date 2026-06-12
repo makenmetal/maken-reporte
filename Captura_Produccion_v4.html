@@ -135,8 +135,8 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  resumen:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
-  resumenManto:{loading:false,data:null},
+  dashboard:{periodo:"hoy",loading:false,prod:null,manto:null},
+  dashboard:{periodo:"hoy",loadingProd:false,loadingManto:false,dataProd:null,dataManto:null},
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
   // Solicitudes
   sol:{
@@ -287,13 +287,24 @@ function fetchCatManto(a){
 // ============================================================
 
 function cargarResumen(){
-  S.resumen.loading=true;S.resumenManto.loading=true;render();
-  apiGet({action:"reportes",fecha:S.resumen.fecha,turno:S.resumen.turno})
-    .then(function(d){S.resumen.data=d;S.resumen.loading=false;render();})
-    .catch(function(){S.resumen.data=[];S.resumen.loading=false;render();});
-  apiGetManto({action:"resumenManto",fecha:S.resumen.fecha,turno:S.resumen.turno})
-    .then(function(d){S.resumenManto.data=d;S.resumenManto.loading=false;render();})
-    .catch(function(){S.resumenManto.data=null;S.resumenManto.loading=false;render();});
+  // El dueño ahora tiene Dashboard en lugar del panel resumen viejo
+  cargarDashboard();
+}
+function cargarDashboard(){
+  var p=S.dashboard.periodo;
+  S.dashboard.loading=true;S.dashboard.prod=null;S.dashboard.manto=null;render();
+  var done={prod:false,manto:false};
+  function checkDone(){if(done.prod&&done.manto){S.dashboard.loading=false;render();}}
+  apiGet({action:"dashboardProd",periodo:p})
+    .then(function(d){S.dashboard.prod=d;done.prod=true;checkDone();})
+    .catch(function(){S.dashboard.prod=null;done.prod=true;checkDone();});
+  apiGetManto({action:"dashboardManto",periodo:p})
+    .then(function(d){S.dashboard.manto=d;done.manto=true;checkDone();})
+    .catch(function(){S.dashboard.manto=null;done.manto=true;checkDone();});
+}
+function setDashboardPeriodo(p){
+  S.dashboard.periodo=p;
+  cargarDashboard();
 }
 function cargarMiTurno(){
   S.miturno.loading=true;render();
@@ -708,81 +719,130 @@ function mkResumenCard(label,val,color){
 // ============================================================
 
 function buildResumen(){
-  var r=S.resumen,rows=r.data||[];
-  var prod=rows.filter(function(x){return x.tipo==="Produccion"||x.tipo==="Producción";});
-  var setup=rows.filter(function(x){return x.tipo==="Setup";});
-  var manto=rows.filter(function(x){return x.tipo==="Mantenimiento";});
-  var byMaq={},setupByMaq={},mantoByMaq={};
-  prod.forEach(function(row){if(!byMaq[row.maquina])byMaq[row.maquina]=[];byMaq[row.maquina].push(row);});
-  setup.forEach(function(row){
-    if(!setupByMaq[row.maquina])setupByMaq[row.maquina]={horas:0,responsables:[]};
-    setupByMaq[row.maquina].horas+=parseFloat(row.horasSetup)||0;
-    var num=(row.responsable||"").split(" - ")[0];
-    if(num&&setupByMaq[row.maquina].responsables.indexOf(num)===-1)setupByMaq[row.maquina].responsables.push(num);
-  });
-  manto.forEach(function(row){
-    if(!mantoByMaq[row.maquina])mantoByMaq[row.maquina]={horas:0,tipos:[]};
-    mantoByMaq[row.maquina].horas+=parseFloat(row.horasManto)||0;
-    if(row.tipoManto&&mantoByMaq[row.maquina].tipos.indexOf(row.tipoManto)===-1)mantoByMaq[row.maquina].tipos.push(row.tipoManto);
-  });
-  var allSet={};
-  Object.keys(byMaq).concat(Object.keys(setupByMaq)).concat(Object.keys(mantoByMaq)).forEach(function(k){allSet[k]=1;});
-  var allMaq=Object.keys(allSet).sort();
-  var totalPiezas=prod.reduce(function(a,r){return a+(parseInt(r.piezas)||0);},0);
-  var totalSetup=setup.reduce(function(a,r){return a+(parseFloat(r.horasSetup)||0);},0);
-  var totalManto=manto.reduce(function(a,r){return a+(parseFloat(r.horasManto)||0);},0);
-  var sinRep='<span style="font-size:12px;font-weight:600;color:#888;background:#f0f0f0;padding:3px 10px;border-radius:10px">Sin reporte</span>';
-  var areas=areasPrincipales();
-  var estadoHTML='<div class="card" style="margin-bottom:16px"><p style="font-size:12px;color:#888;font-weight:500;margin-bottom:12px">ESTADO DE MAQUINAS</p>'
-    +areas.map(function(a){
-      return'<p class="area-label" style="margin-top:8px">'+a.area+'</p>'
-        +a.maquinas.map(function(m){
-          var tP=byMaq[m]&&byMaq[m].length>0,tS=setupByMaq[m]&&setupByMaq[m].horas>0,tM=mantoByMaq[m]&&mantoByMaq[m].horas>0;
-          var badges=[tP?'<span style="font-size:11px;font-weight:600;color:#1D9E75;background:#E1F5EE;padding:2px 8px;border-radius:8px">Prod</span>':"",tS?'<span style="font-size:11px;font-weight:600;color:#185FA5;background:#E6F1FB;padding:2px 8px;border-radius:8px">Setup</span>':"",tM?'<span style="font-size:11px;font-weight:600;color:#BA7517;background:#FAEEDA;padding:2px 8px;border-radius:8px">Manto</span>':""].filter(function(x){return x;}).join(" ");
-          return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3"><span style="font-size:15px;font-weight:500">'+m+'</span><div style="display:flex;gap:4px">'+((tP||tS||tM)?badges:sinRep)+'</div></div>';
-        }).join("");
+  // Dashboard del dueño (reemplaza el panel resumen viejo)
+  return buildDashboard();
+}
+
+function buildDashboard(){
+  var d=S.dashboard;
+  var p=d.periodo;
+  var labels={hoy:"Hoy",semana:"Esta semana",mes:"Este mes"};
+  var periodoLabel=labels[p]||"Hoy";
+
+  var selectorHtml='<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +['hoy','semana','mes'].map(function(per){
+      var active=p===per;
+      var label=labels[per];
+      return '<button data-dperiod="'+per+'" style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:14px;font-weight:'+(active?'700':'500')+';cursor:pointer;background:'+(active?'#1D9E75':'#fff')+';color:'+(active?'#fff':'#555')+';box-shadow:'+(active?'none':'0 0 0 1px #e0e0e0')+'">'+label+'</button>';
     }).join("")+'</div>';
-  var detalleHTML=allMaq.length===0?'<p style="color:#888;font-size:14px;text-align:center;padding:1rem">Sin reportes para este turno</p>'
-    :allMaq.map(function(maq){
-      var filas=byMaq[maq]||[],hSetup=setupByMaq[maq],hManto=mantoByMaq[maq];
-      return'<div class="card" style="margin-bottom:12px"><p style="font-weight:600;font-size:16px;margin-bottom:10px;color:#1D9E75">'+maq+'</p>'
-        +(filas.length?'<p style="font-size:12px;color:#888;margin-bottom:6px;font-weight:500">PRODUCCION</p>'+filas.map(function(f){var esOtro=f.noParte&&f.noParte.indexOf("Otro")===0;return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f3"><div><span style="font-size:15px;font-weight:500">'+(f.noParte||"")+'</span><span style="font-size:12px;color:#888;margin-left:6px">'+(f.tipoOperacion||f.operacion||"")+'</span></div><div style="text-align:right"><span style="font-size:20px;font-weight:700">'+(f.piezas||"0")+'</span>'+(esOtro&&f.horasSetup?'<span style="font-size:12px;color:#1D9E75;display:block">'+f.horasSetup+' hrs</span>':"")+'<span style="font-size:11px;color:#888;display:block">'+((f.responsable||"").split(" - ")[0])+'</span></div></div>';}).join(""):"")
-        +(hSetup?'<div style="margin-top:8px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"><div><span style="font-size:13px;color:#185FA5;font-weight:500">Setup</span><span style="font-size:11px;color:#888;margin-left:6px">'+hSetup.responsables.join(", ")+'</span></div><span style="font-size:15px;font-weight:700;color:#185FA5">'+hSetup.horas.toFixed(1)+' hrs</span></div>':"")
-        +(hManto?'<div style="margin-top:4px;padding:8px 0;border-top:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#BA7517;font-weight:500">Manto - '+hManto.tipos.join(", ")+'</span><span style="font-size:15px;font-weight:700;color:#BA7517">'+hManto.horas.toFixed(1)+' hrs</span></div>':"")
-        +'</div>';
-    }).join("");
 
-  // Sección ver operador
-  var empOpts='<option value="">-- seleccionar --</option>'+CAT.empleados.map(function(e){return'<option value="'+e.numero+'"'+(S.verOp.empleadoSel==e.numero?" selected":"")+'>'+e.numero+' - '+e.nombre+'</option>';}).join("");
-  var verOpSection='<div class="card"><p style="font-weight:600;font-size:14px;margin-bottom:10px">Ver / editar registros de operador</p>'
-    +'<div class="field"><select id="verOpEmp">'+empOpts+'</select></div>'
-    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
-    +'<input type="text" id="verOpFecha" value="'+S.verOp.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
-    +'<button class="turno-btn'+(S.verOp.turno==="1ro"?" active":"")+'\" id="voT1">1ro</button>'
-    +'<button class="turno-btn'+(S.verOp.turno==="3ro"?" active":"")+'\" id="voT3">3ro</button>'
-    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="voBuscar">Buscar</button></div>'
-    +(S.verOp.loading?'<div style="text-align:center;padding:1rem;color:#888">Cargando...</div>':"")
-    +(S.verOp.data?buildVerOpLista():"")
+  var loading=d.loading;
+  if(loading){
+    return wrapDashboard(selectorHtml+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
+  }
+
+  var dp=d.prod||{};
+  var dm=d.manto||{};
+
+  // Tarjetas resumen
+  var cards='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
+    +dashCard("PIEZAS",dp.totalPiezas||0,"#1D9E75")
+    +dashCard("HRS PARO",(dp.totalHorasManto||0).toFixed(1),"#BA7517")
+    +dashCard("PENDIENTES",dm.pendientes||0,"#E24B4A")
+    +dashCard("SOLICITUDES",(dm.solicitudes||[]).length,"#185FA5")
     +'</div>';
 
+  // Bloque PRODUCCIÓN
+  var prodBlock='<div class="card" style="margin-bottom:14px">'
+    +'<p style="font-size:13px;font-weight:700;color:#1D9E75;margin-bottom:10px">PRODUCCIÓN</p>'
+    +dashBarChart("Top 5 máquinas",dp.topMaquinas||[],"maquina","piezas","#1D9E75")
+    +dashBarChart("Top 5 operadores",dp.topOperadores||[],"operador","piezas","#1D9E75")
+    +dashBarChart("Piezas por turno",dp.porTurno||[],"turno","piezas","#185FA5")
+    +(p!=="hoy"?dashBarChart("Tendencia diaria",dp.tendenciaDiaria||[],"dia","piezas","#1D9E75"):"")
+    +'</div>';
+
+  // Bloque MANTENIMIENTO
+  var mantoBlock='<div class="card" style="margin-bottom:14px">'
+    +'<p style="font-size:13px;font-weight:700;color:#BA7517;margin-bottom:10px">MANTENIMIENTO</p>'
+    +dashBarChart("Distribución por clasificación",dm.porClasificacion||[],"clasif","count","#BA7517")
+    +'</div>';
+
+  // Tabla de solicitudes con horas
+  var sols=dm.solicitudes||[];
+  var tableHtml='<div class="card" style="margin-bottom:14px">'
+    +'<p style="font-size:13px;font-weight:700;color:#185FA5;margin-bottom:10px">HORAS POR SOLICITUD ('+sols.length+')</p>';
+  if(sols.length===0){
+    tableHtml+='<p style="text-align:center;color:#888;font-size:13px;padding:1rem">Sin solicitudes en el periodo</p>';
+  }else{
+    tableHtml+='<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">'
+      +'<thead><tr style="border-bottom:2px solid #eee">'
+      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">ID</th>'
+      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Máquina</th>'
+      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Clasif.</th>'
+      +'<th style="text-align:right;padding:6px 4px;color:#888;font-weight:600">Hrs</th>'
+      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Téc.</th>'
+      +'<th style="text-align:center;padding:6px 4px;color:#888;font-weight:600">Est.</th>'
+      +'</tr></thead><tbody>'
+      +sols.map(function(s){
+        var estColor=s.estado==="Aceptada"?"#1D9E75":s.estado==="Descartada"?"#888":s.estado==="Abierta"||s.estado==="En proceso"?"#E24B4A":"#BA7517";
+        var estLetra=s.estado==="Aceptada"?"✓":s.estado==="Descartada"?"✗":s.estado==="Abierta"?"A":s.estado==="En proceso"?"P":"C";
+        var idShort=String(s.id||"").replace("SOL-","").replace("DIR-","");
+        var prefIcon=String(s.id||"").indexOf("DIR-")===0?'<span style="color:#BA7517">●</span> ':"";
+        return '<tr style="border-bottom:1px solid #f5f5f3">'
+          +'<td style="padding:6px 4px;font-weight:500">'+prefIcon+idShort+'</td>'
+          +'<td style="padding:6px 4px">'+(s.maquina||"")+'</td>'
+          +'<td style="padding:6px 4px;color:#555">'+(s.clasificacion||"-")+'</td>'
+          +'<td style="padding:6px 4px;text-align:right;font-weight:700">'+(s.horas||0)+'</td>'
+          +'<td style="padding:6px 4px;color:#666">'+(s.tecnico||"")+'</td>'
+          +'<td style="padding:6px 4px;text-align:center"><span style="color:'+estColor+';font-weight:700">'+estLetra+'</span></td>'
+          +'</tr>';
+      }).join("")
+      +'</tbody></table></div>'
+      +'<p style="font-size:11px;color:#888;margin-top:8px">● = Directa | A=Abierta P=En proceso C=Cierre prop. ✓=Aceptada ✗=Descartada</p>';
+  }
+  tableHtml+='</div>';
+
+  return wrapDashboard(selectorHtml+cards+prodBlock+mantoBlock+tableHtml,periodoLabel);
+}
+
+function wrapDashboard(content,periodoLabel){
   return'<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'
-    +'<span style="font-weight:600;font-size:18px">Panel Dueño</span>'
-    +'<div><button class="refresh-btn" id="btnRefreshRes" style="margin-right:8px">↻</button>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
+    +'<span style="font-size:13px;color:#888">'+periodoLabel+' • Saltillo, MX</span></div>'
+    +'<div><button class="refresh-btn" id="btnRefreshDash" style="margin-right:8px">↻</button>'
     +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div></div>'
-    +'<div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    +'<input type="text" id="resumenFecha" value="'+r.fecha+'" placeholder="dd/mm/yyyy" style="flex:1;font-size:15px;padding:8px 10px;min-width:130px;max-width:140px">'
-    +'<button class="turno-btn'+(r.turno==="1ro"?" active":"")+'\" id="rt1">1ro</button>'
-    +'<button class="turno-btn'+(r.turno==="3ro"?" active":"")+'\" id="rt3">3ro</button>'
-    +'<button style="padding:8px 16px;background:#1D9E75;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer" id="btnBuscar">Buscar</button></div></div>'
-    +(r.loading?'<div style="text-align:center;padding:2rem;color:#888">Cargando...</div>'
-      :'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
-        +mkResumenCard("PIEZAS",totalPiezas,"#1D9E75")
-        +mkResumenCard("HRS SETUP",totalSetup.toFixed(1),"#185FA5")
-        +mkResumenCard("HRS MANTO",totalManto.toFixed(1),"#BA7517")
-        +'</div>'+buildResumenManto()+estadoHTML+detalleHTML)
-    +verOpSection
+    +content
     +'</div>';
+}
+
+function dashCard(label,valor,color){
+  return'<div style="background:#fff;border-radius:10px;padding:12px 8px;text-align:center;border:1px solid #eee">'
+    +'<p style="font-size:11px;color:#888;font-weight:500;margin-bottom:4px">'+label+'</p>'
+    +'<p style="font-size:26px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p></div>';
+}
+
+function dashBarChart(titulo,data,keyLabel,keyVal,color){
+  if(!data||data.length===0){
+    return'<p style="font-size:12px;color:#888;font-weight:600;margin-top:10px;margin-bottom:4px">'+titulo+'</p>'
+      +'<p style="font-size:12px;color:#aaa;padding:6px 0">Sin datos</p>';
+  }
+  var max=0;
+  data.forEach(function(d){if(d[keyVal]>max)max=d[keyVal];});
+  if(max<=0)max=1;
+  var bars=data.map(function(d){
+    var v=d[keyVal]||0;
+    var pct=Math.round((v/max)*100);
+    var label=String(d[keyLabel]||"");
+    if(label.length>20)label=label.substring(0,18)+"…";
+    return '<div style="margin-bottom:6px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
+      +'<span style="font-size:12px;color:#555">'+label+'</span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+color+'">'+v+'</span></div>'
+      +'<div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden">'
+      +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>';
+  }).join("");
+  return'<p style="font-size:12px;color:#888;font-weight:600;margin-top:14px;margin-bottom:6px">'+titulo+'</p>'+bars;
 }
 
 function buildResumenManto(){
@@ -820,21 +880,11 @@ function buildVerOpLista(){
 }
 
 function bindResumen(){
-  document.getElementById("btnSalirRes").addEventListener("click",doSalirResumen);
-  document.getElementById("btnRefreshRes").addEventListener("click",cargarResumen);
-  document.getElementById("rt1").addEventListener("click",function(){setRTurno("1ro");});
-  document.getElementById("rt3").addEventListener("click",function(){setRTurno("3ro");});
-  document.getElementById("btnBuscar").addEventListener("click",function(){var inp=document.getElementById("resumenFecha");if(inp)S.resumen.fecha=inp.value;cargarResumen();});
-  var inp=document.getElementById("resumenFecha");if(inp)inp.addEventListener("change",function(e){S.resumen.fecha=e.target.value;});
-  var voEmp=document.getElementById("verOpEmp");if(voEmp)voEmp.addEventListener("change",function(e){S.verOp.empleadoSel=e.target.value;});
-  var voF=document.getElementById("verOpFecha");if(voF)voF.addEventListener("change",function(e){S.verOp.fecha=e.target.value;});
-  var vot1=document.getElementById("voT1");if(vot1)vot1.addEventListener("click",function(){S.verOp.turno="1ro";render();});
-  var vot3=document.getElementById("voT3");if(vot3)vot3.addEventListener("click",function(){S.verOp.turno="3ro";render();});
-  var vob=document.getElementById("voBuscar");if(vob)vob.addEventListener("click",function(){var f=document.getElementById("verOpFecha");if(f)S.verOp.fecha=f.value;cargarVerOperador();});
-  document.querySelectorAll("[data-dueedidx]").forEach(function(el){el.addEventListener("click",function(){editarRegistro(S.verOp.data,parseInt(el.dataset.dueedidx));});});
-  document.querySelectorAll("[data-duebidx]").forEach(function(el){el.addEventListener("click",function(){borrarRegistro(S.verOp.data,parseInt(el.dataset.duebidx));});});
-  // Si está editando, aplicar bindings de edición
-  if(S.editando)bindEditando();
+  var bSalir=document.getElementById("btnSalirRes");if(bSalir)bSalir.addEventListener("click",doSalirResumen);
+  var bRef=document.getElementById("btnRefreshDash");if(bRef)bRef.addEventListener("click",cargarDashboard);
+  document.querySelectorAll("[data-dperiod]").forEach(function(el){
+    el.addEventListener("click",function(){setDashboardPeriodo(el.dataset.dperiod);});
+  });
 }
 
 // ============================================================
