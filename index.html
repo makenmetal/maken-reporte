@@ -135,8 +135,22 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  dashboard:{periodo:"hoy",loading:false,prod:null,manto:null},
-  dashboard:{periodo:"hoy",loadingProd:false,loadingManto:false,dataProd:null,dataManto:null},
+  // Dashboard de eficiencia por máquina (v11)
+  dashboard:{
+    periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
+    area:"all",          // "all" | nombre de área
+    orden:"eff-desc",    // "eff-desc" | "eff-asc" | "pzas"
+    desde:"",            // solo si periodo=custom (YYYY-MM-DD)
+    hasta:"",            // solo si periodo=custom (YYYY-MM-DD)
+    loading:false,
+    data:null,           // respuesta de dashboardEficiencia
+    // Modal de máquina expandida
+    maqModal:{
+      maquina:"",
+      loading:false,
+      data:null
+    }
+  },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
   // Solicitudes
   sol:{
@@ -291,20 +305,55 @@ function cargarResumen(){
   cargarDashboard();
 }
 function cargarDashboard(){
-  var p=S.dashboard.periodo;
-  S.dashboard.loading=true;S.dashboard.prod=null;S.dashboard.manto=null;render();
-  var done={prod:false,manto:false};
-  function checkDone(){if(done.prod&&done.manto){S.dashboard.loading=false;render();}}
-  apiGet({action:"dashboardProd",periodo:p})
-    .then(function(d){S.dashboard.prod=d;done.prod=true;checkDone();})
-    .catch(function(){S.dashboard.prod=null;done.prod=true;checkDone();});
-  apiGetManto({action:"dashboardManto",periodo:p})
-    .then(function(d){S.dashboard.manto=d;done.manto=true;checkDone();})
-    .catch(function(){S.dashboard.manto=null;done.manto=true;checkDone();});
+  var d=S.dashboard;
+  d.loading=true;d.data=null;render();
+  var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area};
+  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  apiGet(params)
+    .then(function(r){S.dashboard.data=r;S.dashboard.loading=false;render();})
+    .catch(function(){S.dashboard.data=null;S.dashboard.loading=false;render();});
 }
 function setDashboardPeriodo(p){
   S.dashboard.periodo=p;
+  if(p==="custom"){
+    // Default: últimos 7 días
+    var hoy=new Date();
+    var hace7=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-7);
+    var fmt=function(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+    if(!S.dashboard.desde)S.dashboard.desde=fmt(hace7);
+    if(!S.dashboard.hasta)S.dashboard.hasta=fmt(hoy);
+  }
   cargarDashboard();
+}
+function setDashboardArea(a){
+  S.dashboard.area=a;
+  cargarDashboard();
+}
+function setDashboardOrden(o){
+  S.dashboard.orden=o;
+  render();
+}
+function aplicarRangoCustom(){
+  var i1=document.getElementById("dashDesde");
+  var i2=document.getElementById("dashHasta");
+  if(!i1||!i2)return;
+  S.dashboard.desde=i1.value;
+  S.dashboard.hasta=i2.value;
+  cargarDashboard();
+}
+function abrirModalMaquina(maq){
+  S.dashboard.maqModal={maquina:maq,loading:true,data:null};
+  render();
+  var d=S.dashboard;
+  var params={action:"dashboardEfMaquina",maquina:maq,periodo:d.periodo,area:"all"};
+  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  apiGet(params)
+    .then(function(r){S.dashboard.maqModal.data=r;S.dashboard.maqModal.loading=false;render();})
+    .catch(function(){S.dashboard.maqModal.loading=false;render();});
+}
+function cerrarModalMaquina(){
+  S.dashboard.maqModal={maquina:"",loading:false,data:null};
+  render();
 }
 function cargarMiTurno(){
   S.miturno.loading=true;render();
@@ -723,127 +772,312 @@ function buildResumen(){
   return buildDashboard();
 }
 
+// ============================================================
+// DASHBOARD DE EFICIENCIA POR MÁQUINA (v11)
+// ============================================================
+
+// Colores por rango de eficiencia
+function _effColor(e){
+  if(e>=100)return{bg:"#E6F1FB",fg:"#0C447C"};   // Azul (sobreproducción)
+  if(e>=80) return{bg:"#E1F5EE",fg:"#0F6E56"};   // Verde
+  if(e>=60) return{bg:"#FAEEDA",fg:"#854F0B"};   // Ámbar
+  return       {bg:"#FCEBEB",fg:"#A32D2D"};      // Rojo
+}
+
 function buildDashboard(){
   var d=S.dashboard;
   var p=d.periodo;
-  var labels={hoy:"Hoy",semana:"Esta semana",mes:"Este mes"};
+  var labels={hoy:"Hoy",semana:"Esta semana",mes:"Este mes",custom:"Rango personalizado"};
   var periodoLabel=labels[p]||"Hoy";
 
-  var selectorHtml='<div style="display:flex;gap:6px;margin-bottom:14px">'
-    +['hoy','semana','mes'].map(function(per){
-      var active=p===per;
-      var label=labels[per];
-      return '<button data-dperiod="'+per+'" style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:14px;font-weight:'+(active?'700':'500')+';cursor:pointer;background:'+(active?'#1D9E75':'#fff')+';color:'+(active?'#fff':'#555')+';box-shadow:'+(active?'none':'0 0 0 1px #e0e0e0')+'">'+label+'</button>';
-    }).join("")+'</div>';
+  // --- Selector de periodo (4 opciones) ---
+  var perBtn=function(per,txt){
+    var act=p===per;
+    return '<button data-dperiod="'+per+'" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-size:13px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#fff')+';color:'+(act?'#fff':'#555')+';box-shadow:'+(act?'none':'0 0 0 1px #e0e0e0')+'">'+txt+'</button>';
+  };
+  var selPeriodo='<div style="display:flex;gap:5px;margin-bottom:10px">'
+    +perBtn('hoy','Hoy')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
+    +'</div>';
 
-  var loading=d.loading;
-  if(loading){
-    return wrapDashboard(selectorHtml+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
+  // --- Inputs de fecha para custom ---
+  var rangoHtml='';
+  if(p==="custom"){
+    rangoHtml='<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:12px;color:#666">'
+      +'<span>Desde</span>'
+      +'<input type="date" id="dashDesde" value="'+(d.desde||'')+'" style="padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid #ddd;flex:1">'
+      +'<span>Hasta</span>'
+      +'<input type="date" id="dashHasta" value="'+(d.hasta||'')+'" style="padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid #ddd;flex:1">'
+      +'<button id="btnAplicarRango" style="padding:6px 12px;border:none;border-radius:6px;background:#1D9E75;color:#fff;font-size:12px;font-weight:600;cursor:pointer">Aplicar</button>'
+      +'</div>';
   }
 
-  var dp=d.prod||{};
-  var dm=d.manto||{};
+  // --- Selector de área + orden ---
+  var areas=["all","Torno","Centro de Maquinado","Bosses","Rectificado Exterior","Rectificado Interior","Corte","Ensamble","Soldadura","Detallado","Avellanado","Roscado"];
+  var areaOptions=areas.map(function(a){
+    var lbl=a==="all"?"Todas las áreas":a;
+    var sel=d.area===a?"selected":"";
+    return '<option value="'+a+'" '+sel+'>'+lbl+'</option>';
+  }).join("");
+  var selArea='<select id="dashArea" style="padding:7px 10px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#333;flex:1;min-width:0">'+areaOptions+'</select>';
 
-  // Tarjetas resumen
-  var cards='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">'
-    +dashCard("PIEZAS",dp.totalPiezas||0,"#1D9E75")
-    +dashCard("HRS PARO",(dp.totalHorasManto||0).toFixed(1),"#BA7517")
-    +dashCard("PENDIENTES",dm.pendientes||0,"#E24B4A")
-    +dashCard("SOLICITUDES",(dm.solicitudes||[]).length,"#185FA5")
+  var ordBtn=function(o,txt){
+    var act=d.orden===o;
+    return '<button data-dord="'+o+'" style="padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#333':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
+  };
+  var selOrden='<div style="display:flex;gap:4px;flex-shrink:0">'
+    +ordBtn('eff-desc','Efic ↓')+ordBtn('eff-asc','Efic ↑')+ordBtn('pzas','Pzas ↓')
     +'</div>';
 
-  // Bloque PRODUCCIÓN
-  var prodBlock='<div class="card" style="margin-bottom:14px">'
-    +'<p style="font-size:13px;font-weight:700;color:#1D9E75;margin-bottom:10px">PRODUCCIÓN</p>'
-    +dashBarChart("Top 5 máquinas",dp.topMaquinas||[],"maquina","piezas","#1D9E75")
-    +dashBarChart("Top 5 operadores",dp.topOperadores||[],"operador","piezas","#1D9E75")
-    +dashBarChart("Piezas por turno",dp.porTurno||[],"turno","piezas","#185FA5")
-    +(p!=="hoy"?dashBarChart("Tendencia diaria",dp.tendenciaDiaria||[],"dia","piezas","#1D9E75"):"")
+  var filtroRow='<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">'+selArea+selOrden+'</div>';
+
+  var controles=selPeriodo+rangoHtml+filtroRow;
+
+  if(d.loading){
+    return wrapDashboard(controles+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
+  }
+
+  var data=d.data;
+  if(!data||!data.ok){
+    return wrapDashboard(controles+'<div style="text-align:center;padding:3rem;color:#E24B4A">Error al cargar datos</div>',periodoLabel);
+  }
+
+  // --- KPIs globales ---
+  var kpis='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">'
+    +dashKpi("EFIC GLOBAL",(data.effGlobal||0)+"%","#1D9E75")
+    +dashKpi("PIEZAS",(data.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
+    +dashKpi("MÁQUINAS",data.numMaquinas||0,"#555")
+    +dashKpi("HRS DISP",(data.totalHrsDisp||0).toFixed(0)+"h","#555")
     +'</div>';
 
-  // Bloque MANTENIMIENTO
-  var mantoBlock='<div class="card" style="margin-bottom:14px">'
-    +'<p style="font-size:13px;font-weight:700;color:#BA7517;margin-bottom:10px">MANTENIMIENTO</p>'
-    +dashBarChart("Distribución por clasificación",dm.porClasificacion||[],"clasif","count","#BA7517")
-    +'</div>';
+  // --- Grid de tarjetas por máquina ---
+  var cards=(data.cards||[]).slice();
+  if(d.orden==="eff-desc")cards.sort(function(a,b){return b.eff-a.eff;});
+  else if(d.orden==="eff-asc")cards.sort(function(a,b){return a.eff-b.eff;});
+  else cards.sort(function(a,b){return b.piezas-a.piezas;});
 
-  // Tabla de solicitudes con horas
-  var sols=dm.solicitudes||[];
-  var tableHtml='<div class="card" style="margin-bottom:14px">'
-    +'<p style="font-size:13px;font-weight:700;color:#185FA5;margin-bottom:10px">HORAS POR SOLICITUD ('+sols.length+')</p>';
-  if(sols.length===0){
-    tableHtml+='<p style="text-align:center;color:#888;font-size:13px;padding:1rem">Sin solicitudes en el periodo</p>';
+  var grid='';
+  if(cards.length===0){
+    grid='<div style="background:#f8fafc;border-radius:10px;padding:40px 20px;text-align:center;color:#888;font-size:13px">Sin actividad en el filtro seleccionado</div>';
   }else{
-    tableHtml+='<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">'
-      +'<thead><tr style="border-bottom:2px solid #eee">'
-      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">ID</th>'
-      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Máquina</th>'
-      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Clasif.</th>'
-      +'<th style="text-align:right;padding:6px 4px;color:#888;font-weight:600">Hrs</th>'
-      +'<th style="text-align:left;padding:6px 4px;color:#888;font-weight:600">Téc.</th>'
-      +'<th style="text-align:center;padding:6px 4px;color:#888;font-weight:600">Est.</th>'
-      +'</tr></thead><tbody>'
-      +sols.map(function(s){
-        var estColor=s.estado==="Aceptada"?"#1D9E75":s.estado==="Descartada"?"#888":s.estado==="Abierta"||s.estado==="En proceso"?"#E24B4A":"#BA7517";
-        var estLetra=s.estado==="Aceptada"?"✓":s.estado==="Descartada"?"✗":s.estado==="Abierta"?"A":s.estado==="En proceso"?"P":"C";
-        var idShort=String(s.id||"").replace("SOL-","").replace("DIR-","");
-        var prefIcon=String(s.id||"").indexOf("DIR-")===0?'<span style="color:#BA7517">●</span> ':"";
-        return '<tr style="border-bottom:1px solid #f5f5f3">'
-          +'<td style="padding:6px 4px;font-weight:500">'+prefIcon+idShort+'</td>'
-          +'<td style="padding:6px 4px">'+(s.maquina||"")+'</td>'
-          +'<td style="padding:6px 4px;color:#555">'+(s.clasificacion||"-")+'</td>'
-          +'<td style="padding:6px 4px;text-align:right;font-weight:700">'+(s.horas||0)+'</td>'
-          +'<td style="padding:6px 4px;color:#666">'+(s.tecnico||"")+'</td>'
-          +'<td style="padding:6px 4px;text-align:center"><span style="color:'+estColor+';font-weight:700">'+estLetra+'</span></td>'
-          +'</tr>';
-      }).join("")
-      +'</tbody></table></div>'
-      +'<p style="font-size:11px;color:#888;margin-top:8px">● = Directa | A=Abierta P=En proceso C=Cierre prop. ✓=Aceptada ✗=Descartada</p>';
+    grid=cards.map(dashMaqCard).join("");
   }
-  tableHtml+='</div>';
 
-  return wrapDashboard(selectorHtml+cards+prodBlock+mantoBlock+tableHtml,periodoLabel);
+  // --- Modal (si hay máquina seleccionada) ---
+  var modal="";
+  if(d.maqModal&&d.maqModal.maquina){
+    modal=buildMaquinaModal();
+  }
+
+  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal;
 }
 
 function wrapDashboard(content,periodoLabel){
-  return'<div style="padding:1rem 1.25rem 3rem;max-width:480px;margin:0 auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+  return'<div style="padding:1rem 1.25rem 3rem;max-width:520px;margin:0 auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
-    +'<span style="font-size:13px;color:#888">'+periodoLabel+' • Saltillo, MX</span></div>'
+    +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
     +'<div><button class="refresh-btn" id="btnRefreshDash" style="margin-right:8px">↻</button>'
     +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div></div>'
     +content
     +'</div>';
 }
 
-function dashCard(label,valor,color){
-  return'<div style="background:#fff;border-radius:10px;padding:12px 8px;text-align:center;border:1px solid #eee">'
-    +'<p style="font-size:11px;color:#888;font-weight:500;margin-bottom:4px">'+label+'</p>'
-    +'<p style="font-size:26px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p></div>';
+function dashKpi(label,valor,color){
+  return'<div style="background:#fff;border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #eee">'
+    +'<p style="font-size:9px;color:#888;font-weight:600;margin-bottom:3px;letter-spacing:0.5px">'+label+'</p>'
+    +'<p style="font-size:17px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p></div>';
 }
 
-function dashBarChart(titulo,data,keyLabel,keyVal,color){
-  if(!data||data.length===0){
-    return'<p style="font-size:12px;color:#888;font-weight:600;margin-top:10px;margin-bottom:4px">'+titulo+'</p>'
-      +'<p style="font-size:12px;color:#aaa;padding:6px 0">Sin datos</p>';
+// Tarjeta individual por máquina
+function dashMaqCard(c){
+  var col=_effColor(c.eff);
+  var total=c.totalHrs||0.001;
+  var pP=(c.hProd/total*100);
+  var pS=(c.hSet/total*100);
+  var pO=(c.hOver/total*100);
+  var pI=(c.hIdle/total*100);
+
+  var bar='<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:#f5f5f3;margin-bottom:8px">'
+    +(pP>0?'<div style="width:'+pP+'%;background:#1D9E75"></div>':'')
+    +(pS>0?'<div style="width:'+pS+'%;background:#888780"></div>':'')
+    +(pO>0?'<div style="width:'+pO+'%;background:#EF9F27"></div>':'')
+    +(pI>0?'<div style="width:'+pI+'%;background:#F0997B"></div>':'')
+    +'</div>';
+
+  var legendRow=function(color,lbl,val){
+    return '<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="display:flex;align-items:center;gap:5px;color:#666;font-size:11px"><span style="width:7px;height:7px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
+      +'<span style="font-size:11px;font-weight:600;color:#222">'+val.toFixed(1)+'h</span></div>';
+  };
+  var legend='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-bottom:12px">'
+    +legendRow("#1D9E75","Producción",c.hProd)
+    +legendRow("#888780","Montaje",c.hSet)
+    +legendRow("#EF9F27","Sobre-setup",c.hOver)
+    +legendRow("#F0997B","Ocioso",c.hIdle)
+    +'</div>';
+
+  var acts=(c.acts||[]).slice(0,5);
+  var actsHtml='';
+  if(acts.length===0){
+    actsHtml='<p style="font-size:11px;color:#aaa;padding:4px 0">Sin producción registrada</p>';
+  }else{
+    actsHtml=acts.map(function(a){
+      return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;padding:3px 0;font-size:11px">'
+        +'<div><div style="color:#222;font-weight:500">'+(a.respName||a.resp)+'</div>'
+        +'<div style="color:#888;font-size:10px">'+a.np+' · op '+a.op+'</div></div>'
+        +'<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3">'
+        +(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>'
+        +'</div>';
+    }).join("");
+    if(c.acts.length>5){
+      actsHtml+='<p style="font-size:10px;color:#999;text-align:center;padding:4px 0">+ '+(c.acts.length-5)+' más — toca para ver detalle</p>';
+    }
   }
-  var max=0;
-  data.forEach(function(d){if(d[keyVal]>max)max=d[keyVal];});
-  if(max<=0)max=1;
-  var bars=data.map(function(d){
-    var v=d[keyVal]||0;
-    var pct=Math.round((v/max)*100);
-    var label=String(d[keyLabel]||"");
-    if(label.length>20)label=label.substring(0,18)+"…";
-    return '<div style="margin-bottom:6px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
-      +'<span style="font-size:12px;color:#555">'+label+'</span>'
-      +'<span style="font-size:12px;font-weight:700;color:'+color+'">'+v+'</span></div>'
-      +'<div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden">'
-      +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>';
-  }).join("");
-  return'<p style="font-size:12px;color:#888;font-weight:600;margin-top:14px;margin-bottom:6px">'+titulo+'</p>'+bars;
+
+  var alertas="";
+  if(c.sinStd>0){
+    alertas+='<div style="font-size:10px;padding:5px 7px;border-radius:5px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ '+c.sinStd+' reporte'+(c.sinStd>1?'s':'')+' sin estándar en catálogo</div>';
+  }
+
+  return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
+    +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
+    +'<div style="font-size:15px;font-weight:600">'+_esc(c.maquina)+'</div>'
+    +'<div style="font-size:11px;color:#888">'+c.turnos+' turno'+(c.turnos>1?'s':'')+'</div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:12px">'+_esc(c.area||"")+'</div>'
+    +'<div style="text-align:center;padding:10px 0;margin-bottom:12px;border-radius:8px;background:'+col.bg+'">'
+    +'<div style="font-size:36px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+c.eff+'%</div>'
+    +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">EFICIENCIA</div>'
+    +'</div>'
+    +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
+    +bar+legend
+    +'<div style="border-top:1px solid #f0f0f0;padding-top:8px">'
+    +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Actividad detallada</p>'
+    +actsHtml
+    +alertas
+    +'</div></div>';
 }
+
+// Modal de máquina expandida con tendencia diaria
+function buildMaquinaModal(){
+  var mm=S.dashboard.maqModal;
+  var body="";
+  if(mm.loading){
+    body='<div style="padding:3rem;text-align:center;color:#888">Cargando...</div>';
+  }else if(!mm.data||!mm.data.ok){
+    body='<div style="padding:3rem;text-align:center;color:#E24B4A">Error al cargar datos de máquina</div>';
+  }else{
+    var d=mm.data;
+    var res=d.resumen||{};
+    var col=_effColor(res.eff||0);
+
+    // Header con eficiencia grande
+    var header='<div style="text-align:center;padding:14px 0;margin-bottom:14px;border-radius:10px;background:'+col.bg+'">'
+      +'<div style="font-size:44px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+(res.eff||0)+'%</div>'
+      +'<div style="font-size:11px;color:'+col.fg+';margin-top:5px;letter-spacing:0.5px">EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas</div>'
+      +'</div>';
+
+    // Gráfica de tendencia SVG
+    var tend=d.tendencia||[];
+    var chart="";
+    if(tend.length>0){
+      chart='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Tendencia diaria de eficiencia</p>';
+      chart+=_svgLineChart(tend,"eff","dia",240,120);
+    }
+
+    // Distribución total
+    var totHrs=res.totalHrs||0.001;
+    var pP=(res.hProd/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pI=(res.hIdle/totHrs*100);
+    var distr='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Distribución de '+totHrs.toFixed(1)+'h totales</p>'
+      +'<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f5f5f3;margin-bottom:10px">'
+      +(pP>0?'<div style="width:'+pP+'%;background:#1D9E75"></div>':'')
+      +(pS>0?'<div style="width:'+pS+'%;background:#888780"></div>':'')
+      +(pO>0?'<div style="width:'+pO+'%;background:#EF9F27"></div>':'')
+      +(pI>0?'<div style="width:'+pI+'%;background:#F0997B"></div>':'')
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
+      +_distrRow("#1D9E75","Producción",res.hProd)
+      +_distrRow("#888780","Montaje",res.hSet)
+      +_distrRow("#EF9F27","Sobre-setup",res.hOver)
+      +_distrRow("#F0997B","Ocioso",res.hIdle)
+      +'</div>';
+
+    // Actividad completa
+    var acts=res.acts||[];
+    var actsBlock='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Actividad completa ('+acts.length+' entradas)</p>';
+    if(acts.length===0){
+      actsBlock+='<p style="font-size:12px;color:#aaa;padding:8px 0">Sin producción registrada</p>';
+    }else{
+      actsBlock+='<div style="max-height:200px;overflow-y:auto">'
+        +acts.map(function(a){
+          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f3;font-size:12px">'
+            +'<div><div style="color:#222;font-weight:500">'+(a.respName||a.resp)+'</div>'
+            +'<div style="color:#888;font-size:11px">'+a.np+' · op '+a.op+'</div></div>'
+            +'<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'
+            +(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div></div>';
+        }).join("")+'</div>';
+    }
+
+    body=header+chart+distr+actsBlock;
+    if(res.sinStd>0){
+      body+='<div style="font-size:11px;padding:6px 8px;border-radius:5px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar (no cuentan en eficiencia)</div>';
+    }
+  }
+
+  return '<div id="mkmMaqModalBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:500px;width:100%;margin-top:20px;padding:18px 20px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    +'<div><div style="font-size:17px;font-weight:600">'+_esc(mm.maquina)+'</div>'
+    +'<div style="font-size:12px;color:#888">'+_esc(mm.data&&mm.data.area||"")+'</div></div>'
+    +'<button id="btnCerrarMaqModal" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
+}
+
+// SVG helper: gráfica de línea simple
+function _svgLineChart(data,valKey,labelKey,w,h){
+  if(!data||data.length===0)return'<p style="color:#aaa;font-size:12px">Sin datos</p>';
+  var pad={top:12,right:8,bottom:24,left:28};
+  var innerW=w-pad.left-pad.right;
+  var innerH=h-pad.top-pad.bottom;
+  var maxV=Math.max(100,Math.ceil(Math.max.apply(null,data.map(function(d){return d[valKey]||0;}))/10)*10);
+  var pts=data.map(function(d,i){
+    var x=pad.left+(data.length===1?innerW/2:i/(data.length-1)*innerW);
+    var y=pad.top+innerH-((d[valKey]||0)/maxV)*innerH;
+    return{x:x,y:y,d:d};
+  });
+  var polyline=pts.map(function(p){return p.x+","+p.y;}).join(" ");
+  // Grid lines cada 25
+  var gridLines="";
+  for(var g=0;g<=maxV;g+=25){
+    var y=pad.top+innerH-(g/maxV)*innerH;
+    gridLines+='<line x1="'+pad.left+'" y1="'+y+'" x2="'+(w-pad.right)+'" y2="'+y+'" stroke="#eee" stroke-width="1"/>';
+    gridLines+='<text x="'+(pad.left-4)+'" y="'+(y+3)+'" font-size="9" fill="#888" text-anchor="end">'+g+'</text>';
+  }
+  var line100='<line x1="'+pad.left+'" y1="'+(pad.top+innerH-(100/maxV)*innerH)+'" x2="'+(w-pad.right)+'" y2="'+(pad.top+innerH-(100/maxV)*innerH)+'" stroke="#1D9E75" stroke-width="1" stroke-dasharray="3,3"/>';
+  var dots=pts.map(function(p){
+    var col=_effColor(p.d[valKey]||0);
+    return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="'+col.fg+'"/>';
+  }).join("");
+  var labels=pts.map(function(p,i){
+    if(data.length>7&&i%Math.ceil(data.length/7)!==0)return"";
+    return '<text x="'+p.x+'" y="'+(h-8)+'" font-size="9" fill="#888" text-anchor="middle">'+p.d[labelKey]+'</text>';
+  }).join("");
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="max-width:'+w+'px;display:block;margin:0 auto">'
+    +gridLines+line100
+    +'<polyline points="'+polyline+'" fill="none" stroke="#1D9E75" stroke-width="2"/>'
+    +dots+labels
+    +'</svg>';
+}
+
+function _distrRow(color,lbl,val){
+  return'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="display:flex;align-items:center;gap:6px;color:#666"><span style="width:8px;height:8px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
+    +'<span style="font-weight:600;color:#222">'+(val||0).toFixed(1)+'h</span></div>';
+}
+
+function _esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
 function buildResumenManto(){
   var rm=S.resumenManto;
@@ -882,9 +1116,29 @@ function buildVerOpLista(){
 function bindResumen(){
   var bSalir=document.getElementById("btnSalirRes");if(bSalir)bSalir.addEventListener("click",doSalirResumen);
   var bRef=document.getElementById("btnRefreshDash");if(bRef)bRef.addEventListener("click",cargarDashboard);
+  // Botones de periodo
   document.querySelectorAll("[data-dperiod]").forEach(function(el){
     el.addEventListener("click",function(){setDashboardPeriodo(el.dataset.dperiod);});
   });
+  // Selector de área
+  var aSel=document.getElementById("dashArea");
+  if(aSel)aSel.addEventListener("change",function(){setDashboardArea(aSel.value);});
+  // Botones de orden
+  document.querySelectorAll("[data-dord]").forEach(function(el){
+    el.addEventListener("click",function(){setDashboardOrden(el.dataset.dord);});
+  });
+  // Botón aplicar rango custom
+  var bApl=document.getElementById("btnAplicarRango");
+  if(bApl)bApl.addEventListener("click",aplicarRangoCustom);
+  // Tarjetas de máquina — click abre modal
+  document.querySelectorAll("[data-mkm-maq]").forEach(function(el){
+    el.addEventListener("click",function(){abrirModalMaquina(el.dataset.mkmMaq);});
+  });
+  // Modal: cerrar por botón o click en overlay
+  var bCer=document.getElementById("btnCerrarMaqModal");
+  if(bCer)bCer.addEventListener("click",cerrarModalMaquina);
+  var bg=document.getElementById("mkmMaqModalBg");
+  if(bg)bg.addEventListener("click",function(e){if(e.target.id==="mkmMaqModalBg")cerrarModalMaquina();});
 }
 
 // ============================================================
