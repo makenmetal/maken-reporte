@@ -135,10 +135,11 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  // Dashboard de eficiencia por máquina (v11)
+  // Dashboard de eficiencia por máquina (v11.1)
   dashboard:{
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
     area:"all",          // "all" | nombre de área
+    turno:"all",         // "all" | "1ro" | "3ro"
     orden:"eff-desc",    // "eff-desc" | "eff-asc" | "pzas"
     desde:"",            // solo si periodo=custom (YYYY-MM-DD)
     hasta:"",            // solo si periodo=custom (YYYY-MM-DD)
@@ -307,7 +308,7 @@ function cargarResumen(){
 function cargarDashboard(){
   var d=S.dashboard;
   d.loading=true;d.data=null;render();
-  var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area};
+  var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area,turno:d.turno};
   if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
   apiGet(params)
     .then(function(r){S.dashboard.data=r;S.dashboard.loading=false;render();})
@@ -329,6 +330,10 @@ function setDashboardArea(a){
   S.dashboard.area=a;
   cargarDashboard();
 }
+function setDashboardTurno(t){
+  S.dashboard.turno=t;
+  cargarDashboard();
+}
 function setDashboardOrden(o){
   S.dashboard.orden=o;
   render();
@@ -345,7 +350,7 @@ function abrirModalMaquina(maq){
   S.dashboard.maqModal={maquina:maq,loading:true,data:null};
   render();
   var d=S.dashboard;
-  var params={action:"dashboardEfMaquina",maquina:maq,periodo:d.periodo,area:"all"};
+  var params={action:"dashboardEfMaquina",maquina:maq,periodo:d.periodo,area:"all",turno:d.turno};
   if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
   apiGet(params)
     .then(function(r){S.dashboard.maqModal.data=r;S.dashboard.maqModal.loading=false;render();})
@@ -811,7 +816,7 @@ function buildDashboard(){
       +'</div>';
   }
 
-  // --- Selector de área + orden ---
+  // --- Selector de área + turno + orden ---
   var areas=["all","Torno","Centro de Maquinado","Bosses","Rectificado Exterior","Rectificado Interior","Corte","Ensamble","Soldadura","Detallado","Avellanado","Roscado"];
   var areaOptions=areas.map(function(a){
     var lbl=a==="all"?"Todas las áreas":a;
@@ -820,17 +825,25 @@ function buildDashboard(){
   }).join("");
   var selArea='<select id="dashArea" style="padding:7px 10px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#333;flex:1;min-width:0">'+areaOptions+'</select>';
 
+  var turBtn=function(t,txt){
+    var act=d.turno===t;
+    return '<button data-dturno="'+t+'" style="padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#185FA5':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
+  };
+  var selTurno='<div style="display:flex;gap:4px;flex-shrink:0">'
+    +turBtn('all','Todos')+turBtn('1ro','1ro')+turBtn('3ro','3ro')
+    +'</div>';
+
+  var filtroRow='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">'+selArea+selTurno+'</div>';
+
   var ordBtn=function(o,txt){
     var act=d.orden===o;
     return '<button data-dord="'+o+'" style="padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#333':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
   };
-  var selOrden='<div style="display:flex;gap:4px;flex-shrink:0">'
+  var ordenRow='<div style="display:flex;gap:4px;margin-bottom:14px;justify-content:flex-end">'
     +ordBtn('eff-desc','Efic ↓')+ordBtn('eff-asc','Efic ↑')+ordBtn('pzas','Pzas ↓')
     +'</div>';
 
-  var filtroRow='<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">'+selArea+selOrden+'</div>';
-
-  var controles=selPeriodo+rangoHtml+filtroRow;
+  var controles=selPeriodo+rangoHtml+filtroRow+ordenRow;
 
   if(d.loading){
     return wrapDashboard(controles+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
@@ -895,25 +908,32 @@ function dashMaqCard(c){
   var pP=(c.hProd/total*100);
   var pS=(c.hSet/total*100);
   var pO=(c.hOver/total*100);
+  var pM=((c.hManto||0)/total*100);
   var pI=(c.hIdle/total*100);
 
+  // Colores unificados por categoría
+  var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
+
   var bar='<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:#f5f5f3;margin-bottom:8px">'
-    +(pP>0?'<div style="width:'+pP+'%;background:#1D9E75"></div>':'')
-    +(pS>0?'<div style="width:'+pS+'%;background:#888780"></div>':'')
-    +(pO>0?'<div style="width:'+pO+'%;background:#EF9F27"></div>':'')
-    +(pI>0?'<div style="width:'+pI+'%;background:#F0997B"></div>':'')
+    +(pP>0?'<div style="width:'+pP+'%;background:'+COL_PROD+'"></div>':'')
+    +(pS>0?'<div style="width:'+pS+'%;background:'+COL_SET+'"></div>':'')
+    +(pO>0?'<div style="width:'+pO+'%;background:'+COL_OVER+'"></div>':'')
+    +(pM>0?'<div style="width:'+pM+'%;background:'+COL_MANTO+'"></div>':'')
+    +(pI>0?'<div style="width:'+pI+'%;background:'+COL_IDLE+'"></div>':'')
     +'</div>';
 
-  var legendRow=function(color,lbl,val){
+  // Legend con horas + porcentaje al lado
+  var legendRow=function(color,lbl,val,pct){
     return '<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="display:flex;align-items:center;gap:5px;color:#666;font-size:11px"><span style="width:7px;height:7px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
-      +'<span style="font-size:11px;font-weight:600;color:#222">'+val.toFixed(1)+'h</span></div>';
+      +'<span style="font-size:11px;color:#222"><span style="font-weight:600">'+val.toFixed(1)+'h</span> <span style="color:#888">('+Math.round(pct)+'%)</span></span></div>';
   };
   var legend='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-bottom:12px">'
-    +legendRow("#1D9E75","Producción",c.hProd)
-    +legendRow("#888780","Montaje",c.hSet)
-    +legendRow("#EF9F27","Sobre-setup",c.hOver)
-    +legendRow("#F0997B","Ocioso",c.hIdle)
+    +legendRow(COL_PROD,"Producción",c.hProd,pP)
+    +legendRow(COL_SET,"Montaje",c.hSet,pS)
+    +legendRow(COL_OVER,"Sobre-setup",c.hOver,pO)
+    +legendRow(COL_MANTO,"Manto",c.hManto||0,pM)
+    +legendRow(COL_IDLE,"Ocioso",c.hIdle,pI)
     +'</div>';
 
   var acts=(c.acts||[]).slice(0,5);
@@ -922,11 +942,17 @@ function dashMaqCard(c){
     actsHtml='<p style="font-size:11px;color:#aaa;padding:4px 0">Sin producción registrada</p>';
   }else{
     actsHtml=acts.map(function(a){
+      var horasCell=a.sinStd
+        ? '<div style="color:#854F0B;text-align:right;line-height:1.3;font-size:10px">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:3px;font-weight:700;font-size:9px">SIN ESTÁNDAR</span></div>'
+        : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
+      var pzasCell=a.sinStd
+        ? '<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>'
+        : '';
       return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;padding:3px 0;font-size:11px">'
-        +'<div><div style="color:#222;font-weight:500">'+(a.respName||a.resp)+'</div>'
-        +'<div style="color:#888;font-size:10px">'+a.np+' · op '+a.op+'</div></div>'
-        +'<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3">'
-        +(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>'
+        +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+(a.respName||a.resp)+'</div>'
+        +'<div style="color:#888;font-size:10px">'+a.np+' · op '+a.op+'</div>'
+        +pzasCell+'</div>'
+        +horasCell
         +'</div>';
     }).join("");
     if(c.acts.length>5){
@@ -934,15 +960,13 @@ function dashMaqCard(c){
     }
   }
 
-  var alertas="";
-  if(c.sinStd>0){
-    alertas+='<div style="font-size:10px;padding:5px 7px;border-radius:5px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ '+c.sinStd+' reporte'+(c.sinStd>1?'s':'')+' sin estándar en catálogo</div>';
-  }
+  // Turnos presentes (ej: "1ro · 3ro")
+  var turnosStr=(c.turnosPresentes&&c.turnosPresentes.length)?c.turnosPresentes.join(" · "):c.turnos+" turno"+(c.turnos>1?'s':'');
 
   return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
     +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
     +'<div style="font-size:15px;font-weight:600">'+_esc(c.maquina)+'</div>'
-    +'<div style="font-size:11px;color:#888">'+c.turnos+' turno'+(c.turnos>1?'s':'')+'</div>'
+    +'<div style="font-size:11px;color:#888">'+_esc(turnosStr)+'</div>'
     +'</div>'
     +'<div style="font-size:11px;color:#888;margin-bottom:12px">'+_esc(c.area||"")+'</div>'
     +'<div style="text-align:center;padding:10px 0;margin-bottom:12px;border-radius:8px;background:'+col.bg+'">'
@@ -954,7 +978,6 @@ function dashMaqCard(c){
     +'<div style="border-top:1px solid #f0f0f0;padding-top:8px">'
     +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Actividad detallada</p>'
     +actsHtml
-    +alertas
     +'</div></div>';
 }
 
@@ -985,24 +1008,27 @@ function buildMaquinaModal(){
       chart+=_svgLineChart(tend,"eff","dia",240,120);
     }
 
-    // Distribución total
+    // Distribución total (incluye manto)
     var totHrs=res.totalHrs||0.001;
-    var pP=(res.hProd/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pI=(res.hIdle/totHrs*100);
+    var pP=(res.hProd/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pM=((res.hManto||0)/totHrs*100),pI=(res.hIdle/totHrs*100);
+    var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
     var distr='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Distribución de '+totHrs.toFixed(1)+'h totales</p>'
       +'<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f5f5f3;margin-bottom:10px">'
-      +(pP>0?'<div style="width:'+pP+'%;background:#1D9E75"></div>':'')
-      +(pS>0?'<div style="width:'+pS+'%;background:#888780"></div>':'')
-      +(pO>0?'<div style="width:'+pO+'%;background:#EF9F27"></div>':'')
-      +(pI>0?'<div style="width:'+pI+'%;background:#F0997B"></div>':'')
+      +(pP>0?'<div style="width:'+pP+'%;background:'+COL_PROD+'"></div>':'')
+      +(pS>0?'<div style="width:'+pS+'%;background:'+COL_SET+'"></div>':'')
+      +(pO>0?'<div style="width:'+pO+'%;background:'+COL_OVER+'"></div>':'')
+      +(pM>0?'<div style="width:'+pM+'%;background:'+COL_MANTO+'"></div>':'')
+      +(pI>0?'<div style="width:'+pI+'%;background:'+COL_IDLE+'"></div>':'')
       +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
-      +_distrRow("#1D9E75","Producción",res.hProd)
-      +_distrRow("#888780","Montaje",res.hSet)
-      +_distrRow("#EF9F27","Sobre-setup",res.hOver)
-      +_distrRow("#F0997B","Ocioso",res.hIdle)
+      +_distrRow(COL_PROD,"Producción",res.hProd,pP)
+      +_distrRow(COL_SET,"Montaje",res.hSet,pS)
+      +_distrRow(COL_OVER,"Sobre-setup",res.hOver,pO)
+      +_distrRow(COL_MANTO,"Manto",res.hManto||0,pM)
+      +_distrRow(COL_IDLE,"Ocioso",res.hIdle,pI)
       +'</div>';
 
-    // Actividad completa
+    // Actividad completa (incluye reportes sin estándar)
     var acts=res.acts||[];
     var actsBlock='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Actividad completa ('+acts.length+' entradas)</p>';
     if(acts.length===0){
@@ -1010,17 +1036,21 @@ function buildMaquinaModal(){
     }else{
       actsBlock+='<div style="max-height:200px;overflow-y:auto">'
         +acts.map(function(a){
+          var horasCell=a.sinStd
+            ? '<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>'
+            : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
+          var pzasCell=a.sinStd?'<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>':'';
           return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f3;font-size:12px">'
-            +'<div><div style="color:#222;font-weight:500">'+(a.respName||a.resp)+'</div>'
-            +'<div style="color:#888;font-size:11px">'+a.np+' · op '+a.op+'</div></div>'
-            +'<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'
-            +(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div></div>';
+            +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+(a.respName||a.resp)+'</div>'
+            +'<div style="color:#888;font-size:11px">'+a.np+' · op '+a.op+'</div>'
+            +pzasCell+'</div>'
+            +horasCell+'</div>';
         }).join("")+'</div>';
     }
 
     body=header+chart+distr+actsBlock;
     if(res.sinStd>0){
-      body+='<div style="font-size:11px;padding:6px 8px;border-radius:5px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar (no cuentan en eficiencia)</div>';
+      body+='<div style="font-size:11px;padding:6px 8px;border-radius:5px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar en catálogo (visibles en la lista arriba)</div>';
     }
   }
 
@@ -1071,10 +1101,11 @@ function _svgLineChart(data,valKey,labelKey,w,h){
     +'</svg>';
 }
 
-function _distrRow(color,lbl,val){
+function _distrRow(color,lbl,val,pct){
+  var pctStr=(pct!=null)?' <span style="color:#888;font-weight:400">('+Math.round(pct)+'%)</span>':'';
   return'<div style="display:flex;justify-content:space-between;align-items:center">'
     +'<span style="display:flex;align-items:center;gap:6px;color:#666"><span style="width:8px;height:8px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
-    +'<span style="font-weight:600;color:#222">'+(val||0).toFixed(1)+'h</span></div>';
+    +'<span style="font-weight:600;color:#222">'+(val||0).toFixed(1)+'h'+pctStr+'</span></div>';
 }
 
 function _esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
@@ -1123,6 +1154,10 @@ function bindResumen(){
   // Selector de área
   var aSel=document.getElementById("dashArea");
   if(aSel)aSel.addEventListener("change",function(){setDashboardArea(aSel.value);});
+  // Botones de turno
+  document.querySelectorAll("[data-dturno]").forEach(function(el){
+    el.addEventListener("click",function(){setDashboardTurno(el.dataset.dturno);});
+  });
   // Botones de orden
   document.querySelectorAll("[data-dord]").forEach(function(el){
     el.addEventListener("click",function(){setDashboardOrden(el.dataset.dord);});
