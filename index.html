@@ -135,7 +135,7 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  // Dashboard de eficiencia por máquina (v11.1)
+  // Dashboard de eficiencia por máquina (v11.2)
   dashboard:{
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
     area:"all",          // "all" | nombre de área
@@ -143,8 +143,15 @@ var S = {
     orden:"eff-desc",    // "eff-desc" | "eff-asc" | "pzas"
     desde:"",            // solo si periodo=custom (YYYY-MM-DD)
     hasta:"",            // solo si periodo=custom (YYYY-MM-DD)
+    // Selección múltiple de máquinas — [] = todas (default)
+    maquinas:[],
+    catalogoMaquinas:null,  // catálogo completo (cargado on-demand)
+    // Estado del selector modal
+    selectorMaqOpen:false,
+    selectorMaqBusqueda:"",
+    selectorMaqSeleccion:[],  // selección temporal antes de aplicar
     loading:false,
-    data:null,           // respuesta de dashboardEficiencia
+    data:null,
     // Modal de máquina expandida
     maqModal:{
       maquina:"",
@@ -310,6 +317,8 @@ function cargarDashboard(){
   d.loading=true;d.data=null;render();
   var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area,turno:d.turno};
   if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  // Si hay máquinas específicas seleccionadas, incluirlas en la petición
+  if(d.maquinas&&d.maquinas.length>0){params.maquinas=d.maquinas.join(",");}
   apiGet(params)
     .then(function(r){S.dashboard.data=r;S.dashboard.loading=false;render();})
     .catch(function(){S.dashboard.data=null;S.dashboard.loading=false;render();});
@@ -359,6 +368,75 @@ function abrirModalMaquina(maq){
 function cerrarModalMaquina(){
   S.dashboard.maqModal={maquina:"",loading:false,data:null};
   render();
+}
+// --- Selector múltiple de máquinas ---
+function cargarCatalogoMaquinas(){
+  // Carga el catálogo desde el endpoint "maquinas" y lo guarda para reutilizar
+  if(S.dashboard.catalogoMaquinas)return Promise.resolve(S.dashboard.catalogoMaquinas);
+  return apiGet({action:"maquinas"}).then(function(r){
+    S.dashboard.catalogoMaquinas=Array.isArray(r)?r:[];
+    return S.dashboard.catalogoMaquinas;
+  });
+}
+function abrirSelectorMaquinas(){
+  // Copiar la selección actual como estado temporal (para permitir cancelar)
+  S.dashboard.selectorMaqSeleccion=S.dashboard.maquinas.slice();
+  S.dashboard.selectorMaqBusqueda="";
+  S.dashboard.selectorMaqOpen=true;
+  render();
+  cargarCatalogoMaquinas().then(function(){render();});
+}
+function cerrarSelectorMaquinas(){
+  S.dashboard.selectorMaqOpen=false;
+  render();
+}
+function toggleMaquinaSeleccion(nombre){
+  var sel=S.dashboard.selectorMaqSeleccion;
+  var idx=sel.indexOf(nombre);
+  if(idx>=0)sel.splice(idx,1);
+  else sel.push(nombre);
+  render();
+}
+function seleccionarTodasMaquinas(){
+  // Vacío = todas (semánticamente igual)
+  S.dashboard.selectorMaqSeleccion=[];
+  render();
+}
+function seleccionarMaquinasVisibles(){
+  // Selecciona las máquinas que hacen match con el buscador actual
+  var cat=S.dashboard.catalogoMaquinas||[];
+  var q=(S.dashboard.selectorMaqBusqueda||"").toLowerCase();
+  var visibles=cat.filter(function(m){
+    if(!q)return true;
+    return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
+  }).map(function(m){return m.maquina;});
+  S.dashboard.selectorMaqSeleccion=visibles;
+  render();
+}
+function actualizarBusquedaMaq(){
+  var i=document.getElementById("dashMaqBusq");
+  if(!i)return;
+  S.dashboard.selectorMaqBusqueda=i.value;
+  var cursorPos=i.selectionStart;
+  render();
+  // Restaurar foco después del re-render
+  setTimeout(function(){
+    var newI=document.getElementById("dashMaqBusq");
+    if(newI){
+      newI.focus();
+      try{newI.setSelectionRange(cursorPos,cursorPos);}catch(e){}
+    }
+  },0);
+}
+function aplicarSeleccionMaquinas(){
+  S.dashboard.maquinas=S.dashboard.selectorMaqSeleccion.slice();
+  S.dashboard.selectorMaqOpen=false;
+  cargarDashboard();
+}
+function limpiarSeleccionMaquinasActiva(){
+  // Reset rápido: limpia la selección aplicada (vuelve a "todas")
+  S.dashboard.maquinas=[];
+  cargarDashboard();
 }
 function cargarMiTurno(){
   S.miturno.loading=true;render();
@@ -816,6 +894,20 @@ function buildDashboard(){
       +'</div>';
   }
 
+  // --- Botón de selector múltiple de máquinas ---
+  var nMaqSel=(d.maquinas||[]).length;
+  var maqBtnLabel=nMaqSel>0?("Máquinas: "+nMaqSel+" ▾"):"Máquinas: Todas ▾";
+  var maqBtnStyle=nMaqSel>0
+    ?'padding:7px 12px;font-size:12px;border-radius:8px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;font-weight:600;cursor:pointer'
+    :'padding:7px 12px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#555;cursor:pointer';
+  var maqLimpiarBtn=nMaqSel>0
+    ?'<button id="btnLimpiarMaqSel" style="padding:6px 10px;font-size:11px;border-radius:6px;border:none;background:#f5f5f3;color:#888;cursor:pointer" title="Limpiar selección">✕</button>'
+    :'';
+  var selMaq='<div style="display:flex;gap:6px;flex:1;min-width:0">'
+    +'<button id="btnAbrirSelMaq" style="'+maqBtnStyle+';flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+maqBtnLabel+'</button>'
+    +maqLimpiarBtn
+    +'</div>';
+
   // --- Selector de área + turno + orden ---
   var areas=["all","Torno","Centro de Maquinado","Bosses","Rectificado Exterior","Rectificado Interior","Corte","Ensamble","Soldadura","Detallado","Avellanado","Roscado"];
   var areaOptions=areas.map(function(a){
@@ -823,7 +915,12 @@ function buildDashboard(){
     var sel=d.area===a?"selected":"";
     return '<option value="'+a+'" '+sel+'>'+lbl+'</option>';
   }).join("");
-  var selArea='<select id="dashArea" style="padding:7px 10px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#333;flex:1;min-width:0">'+areaOptions+'</select>';
+  // Si hay máquinas seleccionadas, el área se ignora — mostramos deshabilitado con feedback
+  var areaDisabled=nMaqSel>0?"disabled":"";
+  var areaBg=nMaqSel>0?"#f5f5f3":"#fff";
+  var areaColor=nMaqSel>0?"#aaa":"#333";
+  var areaTitle=nMaqSel>0?"Ignorado por selección de máquinas":"";
+  var selArea='<select id="dashArea" '+areaDisabled+' title="'+areaTitle+'" style="padding:7px 10px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:'+areaBg+';color:'+areaColor+';flex:1;min-width:0">'+areaOptions+'</select>';
 
   var turBtn=function(t,txt){
     var act=d.turno===t;
@@ -833,7 +930,8 @@ function buildDashboard(){
     +turBtn('all','Todos')+turBtn('1ro','1ro')+turBtn('3ro','3ro')
     +'</div>';
 
-  var filtroRow='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">'+selArea+selTurno+'</div>';
+  var filtroRow1='<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'+selMaq+'</div>';
+  var filtroRow2='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">'+selArea+selTurno+'</div>';
 
   var ordBtn=function(o,txt){
     var act=d.orden===o;
@@ -843,7 +941,7 @@ function buildDashboard(){
     +ordBtn('eff-desc','Efic ↓')+ordBtn('eff-asc','Efic ↑')+ordBtn('pzas','Pzas ↓')
     +'</div>';
 
-  var controles=selPeriodo+rangoHtml+filtroRow+ordenRow;
+  var controles=selPeriodo+rangoHtml+filtroRow1+filtroRow2+ordenRow;
 
   if(d.loading){
     return wrapDashboard(controles+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
@@ -880,8 +978,13 @@ function buildDashboard(){
   if(d.maqModal&&d.maqModal.maquina){
     modal=buildMaquinaModal();
   }
+  // --- Modal del selector de máquinas ---
+  var selectorModal="";
+  if(d.selectorMaqOpen){
+    selectorModal=buildSelectorMaquinasModal();
+  }
 
-  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal;
+  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal+selectorModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1110,6 +1213,83 @@ function _distrRow(color,lbl,val,pct){
 
 function _esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
+// Modal para selector múltiple de máquinas
+function buildSelectorMaquinasModal(){
+  var d=S.dashboard;
+  var cat=d.catalogoMaquinas;
+  var body="";
+
+  if(!cat){
+    body='<div style="padding:3rem;text-align:center;color:#888">Cargando catálogo de máquinas...</div>';
+  }else{
+    var q=(d.selectorMaqBusqueda||"").toLowerCase();
+    // Filtrar por búsqueda
+    var maqFiltradas=cat.filter(function(m){
+      if(!q)return true;
+      return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
+    });
+    // Agrupar por área
+    var porArea={};
+    for(var i=0;i<maqFiltradas.length;i++){
+      var ar=maqFiltradas[i].area||"Sin área";
+      if(!porArea[ar])porArea[ar]=[];
+      porArea[ar].push(maqFiltradas[i]);
+    }
+
+    // Buscador + botones de acción rápida
+    var buscador='<div style="position:relative;margin-bottom:12px">'
+      +'<input type="text" id="dashMaqBusq" value="'+_esc(d.selectorMaqBusqueda||"")+'" placeholder="Buscar máquina o área..." '
+      +'style="width:100%;padding:9px 12px 9px 34px;font-size:13px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box">'
+      +'<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa">🔍</span>'
+      +'</div>';
+
+    var accRapidas='<div style="display:flex;gap:6px;margin-bottom:14px">'
+      +'<button id="btnSelTodas" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;flex:1">Limpiar (= todas)</button>'
+      +(q?'<button id="btnSelVisibles" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;flex:1;font-weight:600">Sel. visibles ('+maqFiltradas.length+')</button>':'')
+      +'</div>';
+
+    // Lista agrupada por área
+    var listaHtml="";
+    var areasOrden=Object.keys(porArea).sort();
+    if(areasOrden.length===0){
+      listaHtml='<p style="text-align:center;color:#888;padding:2rem">Sin resultados para "'+_esc(d.selectorMaqBusqueda)+'"</p>';
+    }else{
+      areasOrden.forEach(function(ar){
+        listaHtml+='<div style="margin-bottom:14px">'
+          +'<p style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee">'+_esc(ar)+' ('+porArea[ar].length+')</p>';
+        porArea[ar].forEach(function(m){
+          var isSel=d.selectorMaqSeleccion.indexOf(m.maquina)>=0;
+          var check=isSel?'☑':'☐';
+          var textColor=isSel?"#0F6E56":"#333";
+          listaHtml+='<div class="mkm-maq-opt" data-mkm-selmaq="'+_esc(m.maquina)+'" style="display:flex;align-items:center;gap:10px;padding:8px 6px;cursor:pointer;border-radius:6px;'+(isSel?'background:#F0FAF6':'')+'">'
+            +'<span style="font-size:16px;color:'+textColor+'">'+check+'</span>'
+            +'<span style="font-size:13px;color:'+textColor+';font-weight:'+(isSel?'600':'500')+'">'+_esc(m.maquina)+'</span>'
+            +'</div>';
+        });
+        listaHtml+='</div>';
+      });
+    }
+
+    // Botón de aplicar
+    var nSel=d.selectorMaqSeleccion.length;
+    var aplicarLabel=nSel>0?("Aplicar ("+nSel+" máquina"+(nSel>1?"s":"")+")"):"Aplicar (todas)";
+    var aplicarBtn='<div style="position:sticky;bottom:0;background:#fff;padding:12px 0 4px;border-top:1px solid #eee;margin-top:14px">'
+      +'<button id="btnAplicarMaqSel" style="width:100%;padding:12px;font-size:14px;font-weight:700;border:none;border-radius:8px;background:#1D9E75;color:#fff;cursor:pointer">'+aplicarLabel+'</button>'
+      +'</div>';
+
+    body=buscador+accRapidas+'<div style="max-height:55vh;overflow-y:auto;padding-right:4px">'+listaHtml+'</div>'+aplicarBtn;
+  }
+
+  return '<div id="mkmSelMaqBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1001;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:500px;width:100%;margin-top:20px;padding:18px 20px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div style="font-size:16px;font-weight:600">Seleccionar máquinas</div>'
+    +'<button id="btnCerrarSelMaq" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
+}
+
 function buildResumenManto(){
   var rm=S.resumenManto;
   if(rm.loading)return'<div class="card" style="margin-bottom:16px;padding:1rem"><p style="font-size:12px;color:#888;font-weight:500;margin-bottom:8px">MANTO DEL TURNO</p><p style="color:#888;font-size:13px;text-align:center">Cargando...</p></div>';
@@ -1165,6 +1345,30 @@ function bindResumen(){
   // Botón aplicar rango custom
   var bApl=document.getElementById("btnAplicarRango");
   if(bApl)bApl.addEventListener("click",aplicarRangoCustom);
+  // --- Selector múltiple de máquinas ---
+  var bAbrirSelMaq=document.getElementById("btnAbrirSelMaq");
+  if(bAbrirSelMaq)bAbrirSelMaq.addEventListener("click",abrirSelectorMaquinas);
+  var bLimpiarSel=document.getElementById("btnLimpiarMaqSel");
+  if(bLimpiarSel)bLimpiarSel.addEventListener("click",function(e){e.stopPropagation();limpiarSeleccionMaquinasActiva();});
+  var bCerrarSelMaq=document.getElementById("btnCerrarSelMaq");
+  if(bCerrarSelMaq)bCerrarSelMaq.addEventListener("click",cerrarSelectorMaquinas);
+  var bgSelMaq=document.getElementById("mkmSelMaqBg");
+  if(bgSelMaq)bgSelMaq.addEventListener("click",function(e){if(e.target.id==="mkmSelMaqBg")cerrarSelectorMaquinas();});
+  var bBusq=document.getElementById("dashMaqBusq");
+  if(bBusq){
+    bBusq.addEventListener("input",actualizarBusquedaMaq);
+    // Prevenir que se cierre el modal por foco
+    bBusq.addEventListener("click",function(e){e.stopPropagation();});
+  }
+  var bTodas=document.getElementById("btnSelTodas");
+  if(bTodas)bTodas.addEventListener("click",seleccionarTodasMaquinas);
+  var bVisibles=document.getElementById("btnSelVisibles");
+  if(bVisibles)bVisibles.addEventListener("click",seleccionarMaquinasVisibles);
+  var bAplicarMaq=document.getElementById("btnAplicarMaqSel");
+  if(bAplicarMaq)bAplicarMaq.addEventListener("click",aplicarSeleccionMaquinas);
+  document.querySelectorAll("[data-mkm-selmaq]").forEach(function(el){
+    el.addEventListener("click",function(){toggleMaquinaSeleccion(el.dataset.mkmSelmaq);});
+  });
   // Tarjetas de máquina — click abre modal
   document.querySelectorAll("[data-mkm-maq]").forEach(function(el){
     el.addEventListener("click",function(){abrirModalMaquina(el.dataset.mkmMaq);});
