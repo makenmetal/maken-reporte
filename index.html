@@ -1602,6 +1602,22 @@ function dashMaqCard(c){
   var effLabel = esNA ? 'NO APLICA · MANTO ≥ 90%' : 'EFICIENCIA';
   var effFontSize = esNA ? '30px' : '36px';
 
+  // v11.18: Badge de eficiencia recalibrada bajo el % principal
+  // Solo se muestra si hay al menos 1 medición aplicable y no es N/A
+  var recBadge="";
+  if(!esNA&&c.effRecalibrada!==null&&c.effRecalibrada!==undefined&&(c.partesConMedicion||0)>0){
+    var effRec=c.effRecalibrada;
+    var diff=effRec-c.eff;
+    var recBg="#E6F1FB",recFg="#0C447C",recFlecha="≈";
+    if(diff<-2){recBg="#FCEBEB";recFg="#A32D2D";recFlecha="↓";}
+    else if(diff>2){recBg="#E1F5EE";recFg="#0F6E56";recFlecha="↑";}
+    var diffTxt=(diff>=0?"+":"")+diff;
+    recBadge='<div style="display:flex;justify-content:space-between;align-items:center;background:'+recBg+';border-radius:6px;padding:6px 10px;margin-top:-6px;margin-bottom:10px;font-size:11px">'
+      +'<span style="color:'+recFg+';font-weight:600">Recalibrada: <b>'+effRec+'%</b></span>'
+      +'<span style="color:'+recFg+';font-weight:600">'+recFlecha+' '+diffTxt+' pts</span>'
+      +'</div>';
+  }
+
   // v11.9: La actividad detallada solo se muestra en el modal de detalle,
   // no en la tarjeta principal (mejora legibilidad del resumen).
   return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
@@ -1614,6 +1630,7 @@ function dashMaqCard(c){
     +'<div style="font-size:'+effFontSize+';font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+effValor+'</div>'
     +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">'+effLabel+'</div>'
     +'</div>'
+    +recBadge
     +infoDisp
     +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
     +bar+legend
@@ -1647,7 +1664,7 @@ function buildMaquinaModal(){
       +'<div style="font-size:11px;color:'+col.fg+';margin-top:6px;letter-spacing:0.5px;font-weight:600">'+effLblModal+'</div>'
       +'</div>';
 
-    // v11.17: Bloque de Eficiencia Recalibrada (basada en TC reales medidos)
+    // v11.19: Bloque de Eficiencia Recalibrada (mensajes cortos, detalle en manual)
     var efMax="";
     if(res.effRecalibrada!==null&&res.effRecalibrada!==undefined&&!esNAModal){
       var effRec=res.effRecalibrada;
@@ -1656,44 +1673,28 @@ function buildMaquinaModal(){
       var pSinM=res.partesSinMedicion||0;
       var totalP=pConM+pSinM;
       var diff=effRec-effAct;
-      // Interpretación: si eficiencia recalibrada es MENOR, significa que el catálogo
-      // sobrestima el tiempo (TC medidos son más rápidos → produces piezas equivalentes
-      // a menos horas → eficiencia real es menor)
-      var flechaTxt="",flechaColor="#0C447C",interpretacion="";
+      var flechaTxt="",flechaColor="#0C447C",mensaje="";
       if(diff<-2){
         flechaTxt="↓ "+diff+" pts";
         flechaColor="#A32D2D";
-        interpretacion="El estándar del catálogo <b>sobrestima</b> el tiempo real. La eficiencia mostrada arriba es engañosamente alta.";
+        mensaje="Catálogo sobrestima el tiempo por pieza.";
       }else if(diff>2){
         flechaTxt="↑ +"+diff+" pts";
         flechaColor="#0F6E56";
-        interpretacion="El estándar del catálogo <b>subestima</b> el tiempo real. La máquina va más eficiente de lo que el catálogo indica.";
+        mensaje="Catálogo subestima el tiempo por pieza.";
       }else{
         flechaTxt="≈ "+(diff>=0?"+":"")+diff+" pts";
         flechaColor="#0C447C";
-        interpretacion="El catálogo está <b>bien calibrado</b> respecto a los TC medidos.";
+        mensaje="Catálogo bien calibrado.";
       }
-      // Cobertura de mediciones
-      var cobTxt="";
-      if(totalP===0){
-        cobTxt="Sin mediciones aplicables";
-      }else{
-        var pctCob=Math.round((pConM/totalP)*100);
-        if(pctCob>=80)cobTxt='<span style="color:#0F6E56;font-weight:600">Alta cobertura</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%)';
-        else if(pctCob>=50)cobTxt='<span style="color:#BA7517;font-weight:600">Cobertura media</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%)';
-        else cobTxt='<span style="color:#A32D2D;font-weight:600">Cobertura baja</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%) — captura más para mejorar precisión';
-      }
+      var cobTxt=(totalP===0)?"Sin mediciones":(pConM+"/"+totalP+" partes con TC medido");
 
-      efMax='<div style="background:#fafaf9;border-radius:12px;border:1px solid #E6F1FB;border-left:4px solid #185FA5;padding:14px 16px;margin-bottom:16px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">'
+      efMax='<div style="background:#fafaf9;border-radius:12px;border-left:4px solid #185FA5;padding:12px 16px;margin-bottom:16px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
         +'<div><div style="font-size:11px;color:#888;font-weight:700;letter-spacing:0.5px">EFICIENCIA RECALIBRADA</div>'
-        +'<div style="font-size:10px;color:#888;margin-top:2px">Con TC medidos por ingeniería (últimos 6 meses)</div></div>'
-        +'<div style="text-align:right"><div style="font-size:32px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
-        +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+' vs catálogo</div></div>'
-        +'</div>'
-        +'<div style="font-size:11px;color:#555;line-height:1.5;padding-top:8px;border-top:1px solid #eee">'
-        +'💡 '+interpretacion+'<br>'
-        +'<span style="color:#888;font-size:10px">📊 '+cobTxt+'</span>'
+        +'<div style="font-size:10px;color:#888;margin-top:2px">'+mensaje+' <span style="color:#aaa">· '+cobTxt+'</span></div></div>'
+        +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
+        +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+'</div></div>'
         +'</div>'
         +'</div>';
     }
@@ -2253,6 +2254,22 @@ function buildAyudaDashModal(){
     +catItem("#E1F5EE","Verde (80% a 99%)","Eficiencia dentro del objetivo esperado.")
     +catItem("#E6F1FB","Azul (100% o más)","Sobreproducción. Revisar si el estándar está actualizado o hubo condiciones excepcionales.")
     +catItem("#FBECEC","Rojizo (N/A)","Manto crítico. La máquina no operó lo suficiente para calcular eficiencia.")
+  );
+
+  // v11.19: Sección — Eficiencia Recalibrada
+  body+=sec("Eficiencia recalibrada (TC medidos)",
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">Cuando ingeniería registra tiempos de ciclo reales de una parte + operación, la app recalcula la eficiencia usando esos tiempos medidos en lugar del catálogo.</p>'
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px">Fórmula:</p>'
+    +formula("Eficiencia recalibrada = Σ(piezas × TC medido / 60) / hDisponible × 100")
+    +'<p style="font-size:12px;color:#555;line-height:1.5;margin:10px 0 4px">Sólo se usan mediciones de los <b>últimos 6 meses</b>. Si una parte+op no tiene mediciones, se usa su TC del catálogo como respaldo.</p>'
+    +'<p style="font-size:12px;color:#555;margin:12px 0 4px"><b>Interpretación de la diferencia:</b></p>'
+    +regla("↑","Recalibrada > catálogo",
+      "Los TC medidos son <b>mayores</b> que el catálogo. Cada pieza toma más tiempo del que el estándar indica → el catálogo <b>subestima</b> el tiempo real y debería actualizarse.")
+    +regla("↓","Recalibrada < catálogo",
+      "Los TC medidos son <b>menores</b> que el catálogo. La producción va más rápido que el estándar → el catálogo <b>sobrestima</b> el tiempo (la eficiencia arriba puede ser engañosamente alta).")
+    +regla("≈","Recalibrada ≈ catálogo",
+      "Los TC medidos coinciden con el catálogo (±2 puntos). El estándar está bien calibrado.")
+    +'<p style="font-size:11px;color:#888;margin-top:8px">La cobertura muestra cuántas partes+op de las que corrieron en la máquina tienen mediciones. A mayor cobertura, más confiable el número.</p>'
   );
 
   // Sección 7: Filtros
