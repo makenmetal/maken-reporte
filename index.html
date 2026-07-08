@@ -258,13 +258,18 @@ var S = {
       loading:false,
       data:null
     },
-    // v11.10: Modal apilado de detalle por pieza (operador+parte+op)
+    // v11.10/v11.11: Modal apilado de detalle por parte + operación (global)
+    // Al abrir hereda el periodo del dashboard pero se puede cambiar dentro
     piezaModal:{
-      key:"",           // "maquina|parte|op|resp" — vacío = cerrado
+      noParte:"",       // parte activa
+      operacion:"",     // operación activa (cambiable con selector)
+      periodo:"",       // periodo propio del modal
+      desde:"",         // rango custom propio
+      hasta:"",
       loading:false,
       data:null
     },
-    piezaModalCache:{}  // cache local, invalida al cambiar filtros
+    piezaModalCache:{}  // cache local, invalida al cambiar filtros del dashboard
   },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
   // Solicitudes
@@ -498,29 +503,45 @@ function cerrarModalMaquina(){
   S.dashboard.maqModal={maquina:"",loading:false,data:null};
   render();
 }
-// v11.10: Detalle por pieza (modal apilado sobre modal de máquina)
-function abrirModalPieza(maquina,noParte,operacion,responsable){
+// v11.11: Detalle por parte + operación (global, no por operador/máquina)
+// Al abrir hereda periodo del dashboard. Adentro puede cambiar operación y periodo propio.
+function abrirModalPieza(maquinaSrc, noParte, operacion, respSrc){
+  // maquinaSrc y respSrc se ignoran ahora (viene del click en la tarjeta),
+  // solo usamos noParte y operacion para hacer la búsqueda global
   var d=S.dashboard;
-  var key=maquina+"|"+noParte+"|"+operacion+"|"+responsable;
-  var cacheKey=key+"|"+d.periodo+"|"+d.turno+"|"+(d.desde||"")+"|"+(d.hasta||"");
-  var cached=d.piezaModalCache[cacheKey];
+  // Heredar periodo del dashboard al abrir (solo la primera vez)
+  S.dashboard.piezaModal={
+    noParte:noParte,
+    operacion:operacion,
+    periodo:d.periodo,
+    desde:d.desde||"",
+    hasta:d.hasta||"",
+    loading:true,
+    data:null
+  };
+  render();
+  cargarDetalleParteOp();
+}
+function cargarDetalleParteOp(){
+  var pm=S.dashboard.piezaModal;
+  if(!pm||!pm.noParte)return;
+  var cacheKey=pm.noParte+"|"+pm.operacion+"|"+pm.periodo+"|"+(pm.desde||"")+"|"+(pm.hasta||"");
+  var cached=S.dashboard.piezaModalCache[cacheKey];
   if(cached){
-    S.dashboard.piezaModal={key:key,loading:false,data:cached};
+    S.dashboard.piezaModal.data=cached;
+    S.dashboard.piezaModal.loading=false;
     render();
     return;
   }
-  S.dashboard.piezaModal={key:key,loading:true,data:null};
+  S.dashboard.piezaModal.loading=true;
   render();
   var params={
-    action:"detallePiezaOperador",
-    maquina:maquina,
-    noParte:noParte,
-    operacion:operacion,
-    responsable:responsable,
-    periodo:d.periodo,
-    turno:d.turno
+    action:"detalleParteOperacion",
+    noParte:pm.noParte,
+    operacion:pm.operacion,
+    periodo:pm.periodo
   };
-  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  if(pm.periodo==="custom"){params.desde=pm.desde;params.hasta=pm.hasta;}
   apiGet(params)
     .then(function(r){
       S.dashboard.piezaModalCache[cacheKey]=r;
@@ -533,8 +554,33 @@ function abrirModalPieza(maquina,noParte,operacion,responsable){
       render();
     });
 }
+function cambiarOperacionModal(op){
+  S.dashboard.piezaModal.operacion=op;
+  S.dashboard.piezaModal.data=null;
+  cargarDetalleParteOp();
+}
+function cambiarPeriodoModal(p){
+  S.dashboard.piezaModal.periodo=p;
+  if(p==="custom"){
+    var hoy=new Date();
+    var hace7=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-7);
+    var fmt=function(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+    if(!S.dashboard.piezaModal.desde)S.dashboard.piezaModal.desde=fmt(hace7);
+    if(!S.dashboard.piezaModal.hasta)S.dashboard.piezaModal.hasta=fmt(hoy);
+  }
+  S.dashboard.piezaModal.data=null;
+  cargarDetalleParteOp();
+}
+function aplicarRangoCustomModal(){
+  var i1=document.getElementById("piezaDesde");
+  var i2=document.getElementById("piezaHasta");
+  if(!i1||!i2)return;
+  S.dashboard.piezaModal.desde=i1.value;
+  S.dashboard.piezaModal.hasta=i2.value;
+  cargarDetalleParteOp();
+}
 function cerrarModalPieza(){
-  S.dashboard.piezaModal={key:"",loading:false,data:null};
+  S.dashboard.piezaModal={noParte:"",operacion:"",periodo:"",desde:"",hasta:"",loading:false,data:null};
   render();
 }
 // --- Modal de ayuda / manual ---
@@ -1237,9 +1283,9 @@ function buildDashboard(){
   if(d.maqModal&&d.maqModal.maquina){
     modal=buildMaquinaModal();
   }
-  // v11.10: Modal apilado de detalle por pieza (encima del de máquina)
+  // v11.10/v11.11: Modal apilado de detalle por parte + operación
   var piezaModalHtml="";
-  if(d.piezaModal&&d.piezaModal.key){
+  if(d.piezaModal&&d.piezaModal.noParte){
     piezaModalHtml=buildPiezaModal();
   }
   // --- Modal del selector de máquinas ---
@@ -1590,100 +1636,139 @@ function buildMaquinaModal(){
 
 // v11.10: Modal apilado con detalle por pieza (operador+parte+op)
 // Se abre encima del modal de máquina cuando el usuario toca un renglón de actividad
+// v11.11: Vista GLOBAL por parte + operación (no por máquina/turno/operador)
+// Incluye selector de operación y de periodo propios
 function buildPiezaModal(){
   var pm=S.dashboard.piezaModal;
-  if(!pm||!pm.key)return"";
+  if(!pm||!pm.noParte)return"";
 
-  // Parsear key: "maquina|noParte|operacion|responsable"
-  var partes=pm.key.split("|");
-  var maquina=partes[0]||"";
-  var noParte=partes[1]||"";
-  var operacion=partes[2]||"";
+  var noParte=pm.noParte;
+  var operacion=pm.operacion;
 
   var body="";
+  var selectors="";
+
+  // === Selectores (siempre visibles, incluso en loading) ===
+  // Selector de operación (usa las disponibles del catálogo si ya tenemos data)
+  var opsDisp=(pm.data&&pm.data.operacionesDisponibles)||[operacion];
+  var opsSelHtml=opsDisp.map(function(o){
+    var sel=o===operacion?"selected":"";
+    return '<option value="'+_esc(o)+'" '+sel+'>op '+_esc(o)+'</option>';
+  }).join("");
+  var selOp='<select id="piezaOpSel" style="padding:6px 10px;font-size:12px;border-radius:6px;border:1px solid #ccc;background:#fff">'+opsSelHtml+'</select>';
+
+  // Selector de periodo (Hoy/Semana/Mes/Rango)
+  var perBtn=function(per,txt){
+    var act=pm.periodo===per;
+    return '<button data-mkm-piezaper="'+per+'" style="padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
+  };
+  var perRow='<div style="display:flex;gap:4px">'
+    +perBtn('hoy','Hoy')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
+    +'</div>';
+
+  var rangoRow="";
+  if(pm.periodo==="custom"){
+    rangoRow='<div style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:11px;color:#666">'
+      +'<span>Desde</span>'
+      +'<input type="date" id="piezaDesde" value="'+(pm.desde||'')+'" style="padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid #ccc">'
+      +'<span>Hasta</span>'
+      +'<input type="date" id="piezaHasta" value="'+(pm.hasta||'')+'" style="padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid #ccc">'
+      +'<button id="btnAplicarRangoPieza" style="padding:5px 10px;border:none;border-radius:5px;background:#1D9E75;color:#fff;font-size:11px;font-weight:600;cursor:pointer">Aplicar</button>'
+      +'</div>';
+  }
+
+  selectors='<div style="background:#F5F5F3;border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+    +'<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">'
+    +'<div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:#666;font-weight:600">OPERACIÓN:</span>'+selOp+'</div>'
+    +perRow
+    +'</div>'
+    +rangoRow
+    +'</div>';
+
   if(pm.loading){
-    body='<div style="padding:3rem;text-align:center;color:#888">Cargando detalle...</div>';
+    body=selectors+'<div style="padding:2rem;text-align:center;color:#888">Cargando detalle...</div>';
   }else if(!pm.data||!pm.data.ok){
-    body='<div style="padding:3rem;text-align:center;color:#E24B4A">Error al cargar detalle</div>';
+    body=selectors+'<div style="padding:2rem;text-align:center;color:#E24B4A">Error al cargar detalle</div>';
   }else{
     var d=pm.data;
     var tc=d.tiempoCiclo;
     var pzsPorHora=d.pzsPorHoraEstandar;
 
-    // KPIs de la entrada
+    // KPIs generales
     var infoRow=function(lbl,val,color){
-      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px 12px;text-align:center">'
-        +'<div style="font-size:10px;color:#888;font-weight:600;letter-spacing:0.5px;margin-bottom:4px">'+lbl+'</div>'
-        +'<div style="font-size:20px;font-weight:700;color:'+(color||"#222")+';line-height:1">'+val+'</div>'
+      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px 8px;text-align:center">'
+        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px;margin-bottom:4px">'+lbl+'</div>'
+        +'<div style="font-size:18px;font-weight:700;color:'+(color||"#222")+';line-height:1">'+val+'</div>'
         +'</div>';
     };
-    var tcTxt=tc!==null?tc.toFixed(2)+' min':'<span style="color:#854F0B">—</span>';
+    var tcTxt=tc!==null?tc.toFixed(2):'<span style="color:#854F0B">—</span>';
     var pphTxt=pzsPorHora!==null?pzsPorHora.toFixed(1):'<span style="color:#854F0B">—</span>';
-    var kpiRow='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'
+    var numMaqs=(d.maquinasActivas||[]).length;
+    var kpiRow='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px">'
       +infoRow("PIEZAS",(d.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
-      +infoRow("HRS ESTÁNDAR",(d.totalHorasEstandar||0).toFixed(2)+"h","#1D9E75")
-      +infoRow("TIEMPO CICLO",tcTxt,"#185FA5")
-      +infoRow("PZS/HORA STD",pphTxt,"#185FA5")
+      +infoRow("HRS EST.",(d.totalHorasEstandar||0).toFixed(1)+"h","#1D9E75")
+      +infoRow("REPORTES",(d.numReportes||0),"#555")
+      +infoRow("MÁQUINAS",numMaqs,"#555")
+      +infoRow("TC (min)",tcTxt,"#185FA5")
       +'</div>';
 
-    // Reportes individuales
-    var reportes=d.reportes||[];
-    var reportesBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
-      +'<p style="font-size:12px;color:#333;font-weight:700;margin:0 0 10px">📋 Reportes individuales ('+reportes.length+')</p>';
-    if(reportes.length===0){
-      reportesBlock+='<p style="font-size:12px;color:#aaa;padding:4px 0">Sin reportes en el periodo</p>';
-    }else{
-      reportesBlock+='<div style="max-height:180px;overflow-y:auto;background:#fff;border-radius:6px;border:1px solid #eee">'
-        +'<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;padding:8px 12px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:2px solid #eee;background:#f5f5f3">'
-        +'<div>FECHA</div><div>TURNO</div><div style="text-align:right">PIEZAS</div><div style="text-align:right">HRS EST.</div></div>'
-        +reportes.map(function(r){
-          return '<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;padding:6px 12px;font-size:12px;border-bottom:1px solid #f5f5f3">'
-            +'<div style="color:#333">'+_esc(r.fecha)+'</div>'
-            +'<div style="color:#666">'+_esc(r.turno)+'</div>'
-            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+(r.piezas||0).toLocaleString("es-MX")+'</div>'
-            +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#666">'+(r.horasEstandar||0).toFixed(2)+'h</div>'
-            +'</div>';
-        }).join("")+'</div>';
-    }
-    reportesBlock+='</div>';
-
-    // Tendencia diaria (piezas por día)
+    // Tendencia diaria (gráfica de barras arriba, sin tabla debajo)
     var tend=d.tendencia||[];
     var tendBlock="";
-    if(tend.length>1){
-      tendBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
-        +'<p style="font-size:12px;color:#333;font-weight:700;margin:0 0 8px">📈 Tendencia diaria de producción</p>'
-        +_svgBarChart(tend,"piezas","dia",480,180,"#1D9E75")
-        +'<div style="margin-top:10px;display:grid;grid-template-columns:60px 1fr 1fr 60px;gap:8px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;padding-bottom:4px;border-bottom:1px solid #ddd">'
-        +'<div>DÍA</div><div style="text-align:right">PIEZAS</div><div style="text-align:right">HRS EST.</div><div style="text-align:right">TURNOS</div></div>'
-        +tend.map(function(t){
-          return '<div style="display:grid;grid-template-columns:60px 1fr 1fr 60px;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid #f5f5f3">'
-            +'<div style="color:#333;font-weight:500">'+_esc(t.dia)+'</div>'
-            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+(t.piezas||0).toLocaleString("es-MX")+'</div>'
-            +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#666">'+(t.horas||0).toFixed(2)+'h</div>'
-            +'<div style="text-align:right;color:#666">'+(t.turnos||0)+'</div>'
-            +'</div>';
-        }).join("")+'</div>';
-    }
-
-    // Nota sobre la eficiencia individual
-    var notaEff="";
-    if(tc===null){
-      notaEff='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ Esta parte + operación no tiene TiempoCiclo en el catálogo. Se muestran los datos crudos pero no se calculan horas estándar. Considera agregar el estándar en la pestaña Partes del sheet.</div>';
+    if(tend.length===0){
+      tendBlock='<div style="background:#fafaf9;border-radius:10px;padding:20px;margin-bottom:14px;text-align:center;color:#888;font-size:13px">Sin reportes de esta parte + operación en el periodo</div>';
     }else{
-      notaEff='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#F0F4F8;color:#555">💡 Las "horas estándar" son teóricas: piezas × tiempo ciclo. No se registran horas reales por reporte, así que no se calcula eficiencia individual — solo se ve al nivel de máquina.</div>';
+      var subLabel="1 día";
+      if(tend.length>1)subLabel=tend.length+" días con actividad";
+      tendBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+        +'<p style="font-size:13px;color:#333;font-weight:700;margin:0">📈 Tendencia diaria de producción</p>'
+        +'<span style="font-size:11px;color:#888">'+subLabel+'</span>'
+        +'</div>'
+        +_svgBarChart(tend,"piezas","dia",560,200,"#1D9E75")
+        +'</div>';
     }
 
-    body=kpiRow+reportesBlock+tendBlock+notaEff;
+    // Tabla consolidada operador × máquina
+    var om=d.porOperadorMaquina||[];
+    var omBlock="";
+    if(om.length>0){
+      omBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+        +'<p style="font-size:13px;color:#333;font-weight:700;margin:0">👥 Producción por operador y máquina</p>'
+        +'<span style="font-size:11px;color:#888">'+om.length+' combinación'+(om.length>1?'es':'')+'</span>'
+        +'</div>'
+        +'<div style="max-height:280px;overflow-y:auto;background:#fff;border-radius:6px;border:1px solid #eee">'
+        +'<div style="display:grid;grid-template-columns:1.5fr 1.2fr 60px 70px 60px;gap:8px;padding:8px 12px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:2px solid #eee;background:#f5f5f3;position:sticky;top:0">'
+        +'<div>OPERADOR</div><div>MÁQUINA</div><div style="text-align:right">PZAS</div><div style="text-align:right">HRS EST.</div><div style="text-align:center">TURNOS</div></div>'
+        +om.map(function(o){
+          var turnosStr=(o.turnos||[]).join(" · ");
+          return '<div style="display:grid;grid-template-columns:1.5fr 1.2fr 60px 70px 60px;gap:8px;padding:8px 12px;font-size:12px;border-bottom:1px solid #f5f5f3">'
+            +'<div style="color:#222;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_esc(o.operadorNombre||"")+'">'+_esc(o.operadorNombre||o.operador)+'</div>'
+            +'<div style="color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_esc(o.maquina||"")+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+(o.piezas||0).toLocaleString("es-MX")+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#666">'+(o.horas||0).toFixed(2)+'h</div>'
+            +'<div style="text-align:center;color:#888;font-size:11px">'+turnosStr+'</div>'
+            +'</div>';
+        }).join("")+'</div></div>';
+    }
+
+    // Nota informativa
+    var nota="";
+    if(tc===null){
+      nota='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ Esta parte + operación no tiene TiempoCiclo en el catálogo. Considera agregar el estándar en la pestaña Partes del sheet.</div>';
+    }
+
+    body=selectors+kpiRow+tendBlock+omBlock+nota;
   }
 
   return '<div id="mkmPiezaModalBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1005;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
-    +'<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;margin-top:20px;padding:20px 22px;max-height:90vh;overflow-y:auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #eee">'
+    +'<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;margin-top:20px;padding:20px 22px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee">'
     +'<div style="flex:1">'
-    +'<div style="font-size:12px;color:#888;margin-bottom:2px">'+_esc(pm.data&&pm.data.responsableNombre||"")+'</div>'
-    +'<div style="font-size:19px;font-weight:700">'+_esc(noParte)+' <span style="color:#888;font-weight:500;font-size:14px">· op '+_esc(operacion)+'</span></div>'
-    +'<div style="font-size:12px;color:#888;margin-top:2px">'+_esc(maquina)+'</div>'
+    +'<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px">Análisis por parte</div>'
+    +'<div style="font-size:22px;font-weight:700;color:#222">'+_esc(noParte)+'</div>'
+    +'<div style="font-size:12px;color:#666;margin-top:2px">'+(pm.data&&pm.data.maquinasActivas&&pm.data.maquinasActivas.length?"Producida en: "+pm.data.maquinasActivas.join(", "):"Vista global sin filtro por máquina")+'</div>'
     +'</div>'
     +'<button id="btnCerrarPiezaModal" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
     +'</div>'
@@ -2115,6 +2200,14 @@ function bindResumen(){
   if(bCerP)bCerP.addEventListener("click",cerrarModalPieza);
   var bgP=document.getElementById("mkmPiezaModalBg");
   if(bgP)bgP.addEventListener("click",function(e){if(e.target.id==="mkmPiezaModalBg")cerrarModalPieza();});
+  // v11.11: Selector de operación y periodo dentro del modal
+  var opSel=document.getElementById("piezaOpSel");
+  if(opSel)opSel.addEventListener("change",function(){cambiarOperacionModal(opSel.value);});
+  document.querySelectorAll("[data-mkm-piezaper]").forEach(function(el){
+    el.addEventListener("click",function(){cambiarPeriodoModal(el.dataset.mkmPiezaper);});
+  });
+  var bApR=document.getElementById("btnAplicarRangoPieza");
+  if(bApR)bApR.addEventListener("click",aplicarRangoCustomModal);
 }
 
 // ============================================================
