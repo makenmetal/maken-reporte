@@ -76,6 +76,39 @@ textarea { resize: vertical; min-height: 90px; font-size: 16px; }
 .checkbox-row input[type=checkbox] { width: 20px; height: 20px; }
 .sub-cat-box { background: #FBE5E5; border-radius: 10px; padding: 12px; margin-top: 8px; }
 .sub-cat-box label { color: #9C2828; font-weight: 600; }
+
+/* ============================================================
+   DASHBOARD DE EFICIENCIA — RESPONSIVE PARA COMPUTADORA
+   Móvil = por default (mobile-first, ya definido inline)
+   Desktop ≥900px = grid multi-columna, mayor ancho
+============================================================ */
+.mkm-mach-card:hover { border-color: #1D9E75 !important; box-shadow: 0 2px 8px rgba(29,158,117,0.12); }
+.mkm-mach-empty:hover { border-color: #999 !important; box-shadow: none !important; }
+
+@media (min-width: 900px) {
+  .mkm-dash-wrap {
+    max-width: 1400px !important;
+    padding: 1.5rem 2rem 3rem !important;
+  }
+  .mkm-dash-header {
+    margin-bottom: 24px !important;
+  }
+  /* Grid de tarjetas: 2 columnas hasta 1080, 3 columnas hasta 1400, 4 arriba */
+  .mkm-dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+  .mkm-dash-grid .mkm-mach-card {
+    margin-bottom: 0 !important;
+  }
+}
+@media (min-width: 1400px) {
+  .mkm-dash-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 20px;
+  }
+}
 </style>
 </head>
 <body>
@@ -983,7 +1016,7 @@ function buildDashboard(){
   if(cards.length===0){
     grid='<div style="background:#f8fafc;border-radius:10px;padding:40px 20px;text-align:center;color:#888;font-size:13px">Sin actividad en el filtro seleccionado</div>';
   }else{
-    grid=cards.map(dashMaqCard).join("");
+    grid='<div class="mkm-dash-grid">'+cards.map(dashMaqCard).join("")+'</div>';
   }
 
   // --- Modal (si hay máquina seleccionada) ---
@@ -1001,8 +1034,8 @@ function buildDashboard(){
 }
 
 function wrapDashboard(content,periodoLabel){
-  return'<div style="padding:1rem 1.25rem 3rem;max-width:520px;margin:0 auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+  return'<div class="mkm-dash-wrap" style="padding:1rem 1.25rem 3rem;max-width:520px;margin:0 auto">'
+    +'<div class="mkm-dash-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
     +'<div><button class="refresh-btn" id="btnRefreshDash" style="margin-right:8px">↻</button>'
@@ -1019,6 +1052,20 @@ function dashKpi(label,valor,color){
 
 // Tarjeta individual por máquina
 function dashMaqCard(c){
+  // Caso especial: máquina sin actividad en el periodo
+  if(c.sinActividad){
+    return '<div class="mkm-mach-card mkm-mach-empty" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fafaf9;border-radius:12px;border:1px dashed #ddd;padding:14px 16px;margin-bottom:12px;cursor:pointer;opacity:0.7">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
+      +'<div style="font-size:15px;font-weight:600;color:#666">'+_esc(c.maquina)+'</div>'
+      +'<div style="font-size:11px;color:#aaa">Sin actividad</div>'
+      +'</div>'
+      +'<div style="font-size:11px;color:#aaa;margin-bottom:16px">'+_esc(c.area||"")+'</div>'
+      +'<div style="text-align:center;padding:14px 0;border-radius:8px;background:#f5f5f3">'
+      +'<div style="font-size:36px;font-weight:600;color:#bbb;line-height:1;letter-spacing:-1px">—</div>'
+      +'<div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px">SIN REPORTES EN EL PERIODO</div>'
+      +'</div></div>';
+  }
+
   var col=_effColor(c.eff);
   var total=c.totalHrs||0.001;
   var pP=(c.hProd/total*100);
@@ -1079,6 +1126,12 @@ function dashMaqCard(c){
   // Turnos presentes (ej: "1ro · 3ro")
   var turnosStr=(c.turnosPresentes&&c.turnosPresentes.length)?c.turnosPresentes.join(" · "):c.turnos+" turno"+(c.turnos>1?'s':'');
 
+  // Info adicional de disponibilidad si hay manto
+  var infoDisp='';
+  if((c.hManto||0)>0){
+    infoDisp='<div style="font-size:10px;color:#888;margin-top:-4px;margin-bottom:6px">Base para eficiencia: '+(c.hDisponible||c.totalHrs).toFixed(1)+'h disponibles (9.5h × '+c.turnos+' turnos − '+c.hManto.toFixed(1)+'h manto)</div>';
+  }
+
   return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
     +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
     +'<div style="font-size:15px;font-weight:600">'+_esc(c.maquina)+'</div>'
@@ -1089,6 +1142,7 @@ function dashMaqCard(c){
     +'<div style="font-size:36px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+c.eff+'%</div>'
     +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">EFICIENCIA</div>'
     +'</div>'
+    +infoDisp
     +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
     +bar+legend
     +'<div style="border-top:1px solid #f0f0f0;padding-top:8px">'
