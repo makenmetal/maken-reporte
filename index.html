@@ -229,6 +229,22 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
+  // v11.14: Captura de tiempo de ciclo (Ingeniería)
+  tc:{
+    maquina:"",
+    noParte:"",
+    operacion:"",
+    minutos:"",
+    segundos:"",
+    observaciones:"",
+    // Búsqueda de parte
+    busquedaPartes:"",
+    resultadosBusqueda:[],
+    buscando:false,
+    // Feedback de guardado
+    guardando:false,
+    exito:false
+  },
   // Dashboard de eficiencia por máquina (v11.9)
   dashboard:{
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
@@ -269,6 +285,11 @@ var S = {
       loading:false,
       data:null
     },
+    // v11.14: Modal de búsqueda por número de parte (dashboard)
+    busquedaOpen:false,
+    busquedaQuery:"",
+    busquedaResultados:[],
+    busquedaLoading:false,
     piezaModalCache:{}  // cache local, invalida al cambiar filtros del dashboard
   },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
@@ -542,10 +563,15 @@ function cargarDetalleParteOp(){
     periodo:pm.periodo
   };
   if(pm.periodo==="custom"){params.desde=pm.desde;params.hasta=pm.hasta;}
-  apiGet(params)
-    .then(function(r){
-      S.dashboard.piezaModalCache[cacheKey]=r;
-      S.dashboard.piezaModal.data=r;
+  // v11.14: Cargar en paralelo el detalle y las mediciones de tiempo de ciclo
+  var pDetalle=apiGet(params);
+  var pMediciones=apiGet({action:"tiemposCicloPorParteOp",noParte:pm.noParte,operacion:pm.operacion});
+  Promise.all([pDetalle,pMediciones])
+    .then(function(rs){
+      var data=rs[0];
+      if(data&&rs[1]&&rs[1].ok)data.mediciones=rs[1];
+      S.dashboard.piezaModalCache[cacheKey]=data;
+      S.dashboard.piezaModal.data=data;
       S.dashboard.piezaModal.loading=false;
       render();
     })
@@ -582,6 +608,78 @@ function aplicarRangoCustomModal(){
 function cerrarModalPieza(){
   S.dashboard.piezaModal={noParte:"",operacion:"",periodo:"",desde:"",hasta:"",loading:false,data:null};
   render();
+}
+
+// v11.14: Modal de búsqueda por parte (dashboard 9473)
+function abrirBusquedaParte(){
+  S.dashboard.busquedaOpen=true;
+  S.dashboard.busquedaQuery="";
+  S.dashboard.busquedaResultados=[];
+  render();
+}
+function cerrarBusquedaParte(){
+  S.dashboard.busquedaOpen=false;
+  render();
+}
+function dashBuscarPartes(q){
+  S.dashboard.busquedaQuery=q;
+  if(!q||q.length<2){
+    S.dashboard.busquedaResultados=[];
+    render();
+    return;
+  }
+  S.dashboard.busquedaLoading=true;
+  render();
+  apiGet({action:"buscarPartes",query:q})
+    .then(function(r){
+      S.dashboard.busquedaResultados=r.resultados||[];
+      S.dashboard.busquedaLoading=false;
+      render();
+    })
+    .catch(function(){
+      S.dashboard.busquedaResultados=[];
+      S.dashboard.busquedaLoading=false;
+      render();
+    });
+}
+function dashSeleccionarParte(np,op){
+  // Cerrar modal de búsqueda y abrir el modal de detalle de parte
+  S.dashboard.busquedaOpen=false;
+  abrirModalPieza(null,np,op,null);
+}
+function buildBuscarParteModal(){
+  var d=S.dashboard;
+  var q=d.busquedaQuery||"";
+  var body='<input type="text" id="mkmBusqParteInput" placeholder="Escribe al menos 2 caracteres del número de parte..." value="'+_esc(q)+'" style="width:100%;padding:12px 14px;font-size:15px;border-radius:8px;border:1px solid #ccc;margin-bottom:14px" autocomplete="off" autofocus>';
+  if(d.busquedaLoading){
+    body+='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">Buscando...</div>';
+  }else if(d.busquedaResultados&&d.busquedaResultados.length>0){
+    body+='<div style="max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:8px">'
+      +d.busquedaResultados.map(function(r){
+        var opsHtml=(r.operaciones||[]).map(function(op){
+          return '<button class="mkm-busq-op-btn" data-mkm-np="'+_esc(r.noParte)+'" data-mkm-op="'+_esc(op)+'" style="background:#E1F5EE;color:#0F6E56;border:none;border-radius:5px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-right:4px;margin-top:4px">op '+_esc(op)+'</button>';
+        }).join("");
+        return '<div style="padding:10px 14px;border-bottom:1px solid #f5f5f3">'
+          +'<div style="font-weight:600;color:#222;font-size:14px;margin-bottom:2px">'+_esc(r.noParte)+'</div>'
+          +'<div>'+opsHtml+'</div>'
+          +'</div>';
+      }).join("")+'</div>'
+      +'<p style="font-size:11px;color:#888;text-align:center;margin-top:10px">Toca una operación para ver su detalle histórico</p>';
+  }else if(q&&q.length>=2){
+    body+='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">Sin resultados para "'+_esc(q)+'"</div>';
+  }else{
+    body+='<div style="text-align:center;padding:2rem;color:#aaa;font-size:12px">Empieza a escribir para buscar</div>';
+  }
+
+  return '<div id="mkmBuscarParteBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1010;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;margin-top:20px;padding:20px 22px;max-height:80vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div><div style="font-size:16px;font-weight:700">🔍 Buscar por parte</div>'
+    +'<div style="font-size:11px;color:#888;margin-top:2px">Consulta el histórico de cualquier número de parte</div></div>'
+    +'<button id="btnCerrarBusqParte" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
 }
 // --- Modal de ayuda / manual ---
 function abrirAyudaDash(){
@@ -968,7 +1066,7 @@ function doLogin(val){
   var str=String(val).trim();
   if(str===OWNER_PIN){
     S.esDueno=true;
-    S.empleado={numero:"9473",nombre:"Dueño",puedeSolicitar:true,puedeAceptar:true,esManto:true,puedeReportarManto:true};
+    S.empleado={numero:"9473",nombre:"Dueño",puedeSolicitar:true,puedeAceptar:true,esManto:true,puedeReportarManto:true,esIngenieria:true};
     S.view="resumen";cargarResumen();render();return;
   }
   var n=parseInt(str),emp=null;
@@ -1127,17 +1225,23 @@ function _effColor(e){
 function buildDashboard(){
   var d=S.dashboard;
   var p=d.periodo;
-  var labels={hoy:"Hoy",semana:"Esta semana",mes:"Este mes",custom:"Rango personalizado"};
+  var labels={hoy:"Hoy",ayer:"Ayer",semana:"Esta semana",mes:"Este mes",custom:"Rango personalizado"};
   var periodoLabel=labels[p]||"Hoy";
 
-  // --- Selector de periodo (4 opciones) ---
+  // --- Selector de periodo (5 opciones) ---
   var perBtn=function(per,txt){
     var act=p===per;
-    return '<button data-dperiod="'+per+'" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-size:13px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#fff')+';color:'+(act?'#fff':'#555')+';box-shadow:'+(act?'none':'0 0 0 1px #e0e0e0')+'">'+txt+'</button>';
+    return '<button data-dperiod="'+per+'" style="flex:1;padding:9px 4px;border:none;border-radius:8px;font-size:12px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#fff')+';color:'+(act?'#fff':'#555')+';box-shadow:'+(act?'none':'0 0 0 1px #e0e0e0')+'">'+txt+'</button>';
   };
   var selPeriodo='<div style="display:flex;gap:5px;margin-bottom:10px">'
-    +perBtn('hoy','Hoy')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
+    +perBtn('hoy','Hoy')+perBtn('ayer','Ayer')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
     +'</div>';
+
+  // v11.13: Badge del rango legible (se poblará con data.rangoLabel al cargar)
+  var rangoBadge="";
+  if(d.data&&d.data.rangoLabel){
+    rangoBadge='<div style="display:inline-block;background:#F5F5F3;color:#555;font-size:11px;padding:5px 10px;border-radius:12px;margin-bottom:10px"><span style="color:#888">📅</span> '+_esc(d.data.rangoLabel)+'</div>';
+  }
 
   // --- Inputs de fecha para custom ---
   var rangoHtml='';
@@ -1198,7 +1302,7 @@ function buildDashboard(){
     +ordBtn('eff-desc','Efic ↓')+ordBtn('eff-asc','Efic ↑')+ordBtn('pzas','Pzas ↓')
     +'</div>';
 
-  var controles=selPeriodo+rangoHtml+filtroRow1+filtroRow2+ordenRow;
+  var controles=selPeriodo+rangoHtml+rangoBadge+filtroRow1+filtroRow2+ordenRow;
 
   if(d.loading){
     // v11.9: Si ya hay datos previos, mostrarlos con un overlay de loading
@@ -1298,8 +1402,13 @@ function buildDashboard(){
   if(d.ayudaOpen){
     ayudaModal=buildAyudaDashModal();
   }
+  // v11.14: Modal de búsqueda por parte
+  var busquedaModal="";
+  if(d.busquedaOpen){
+    busquedaModal=buildBuscarParteModal();
+  }
 
-  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal;
+  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal+busquedaModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1308,6 +1417,7 @@ function wrapDashboard(content,periodoLabel){
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
     +'<div style="display:flex;align-items:center;gap:6px" class="mkm-header-buttons">'
+    +'<button id="btnBuscarParte" style="font-size:14px;background:#E1F5EE;border:1px solid #B8E4CF;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0F6E56;font-weight:600" title="Buscar por número de parte">🔍 Parte</button>'
     +'<button id="btnExportarPDF" style="font-size:14px;background:#E6F1FB;border:1px solid #B4D3EE;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0C447C;font-weight:600" title="Exportar / Imprimir como PDF">📄 PDF</button>'
     +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
     +'<button class="refresh-btn" id="btnRefreshDash">↻</button>'
@@ -1657,13 +1767,13 @@ function buildPiezaModal(){
   }).join("");
   var selOp='<select id="piezaOpSel" style="padding:6px 10px;font-size:12px;border-radius:6px;border:1px solid #ccc;background:#fff">'+opsSelHtml+'</select>';
 
-  // Selector de periodo (Hoy/Semana/Mes/Rango)
+  // Selector de periodo (Hoy/Ayer/Semana/Mes/Rango)
   var perBtn=function(per,txt){
     var act=pm.periodo===per;
-    return '<button data-mkm-piezaper="'+per+'" style="padding:5px 10px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
+    return '<button data-mkm-piezaper="'+per+'" style="padding:5px 8px;border:none;border-radius:6px;font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#1D9E75':'#f5f5f3')+';color:'+(act?'#fff':'#555')+'">'+txt+'</button>';
   };
   var perRow='<div style="display:flex;gap:4px">'
-    +perBtn('hoy','Hoy')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
+    +perBtn('hoy','Hoy')+perBtn('ayer','Ayer')+perBtn('semana','Semana')+perBtn('mes','Mes')+perBtn('custom','Rango')
     +'</div>';
 
   var rangoRow="";
@@ -1683,6 +1793,7 @@ function buildPiezaModal(){
     +perRow
     +'</div>'
     +rangoRow
+    +(pm.data&&pm.data.rangoLabel?'<div style="font-size:11px;color:#555;margin-top:8px;padding-top:8px;border-top:1px solid #e6e6e4"><span style="color:#888">📅</span> '+_esc(pm.data.rangoLabel)+'</div>':'')
     +'</div>';
 
   if(pm.loading){
@@ -1759,7 +1870,52 @@ function buildPiezaModal(){
       nota='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ Esta parte + operación no tiene TiempoCiclo en el catálogo. Considera agregar el estándar en la pestaña Partes del sheet.</div>';
     }
 
-    body=selectors+kpiRow+tendBlock+omBlock+nota;
+    // v11.14: Mediciones de tiempo de ciclo (solo si hay ≥1)
+    var medBlock="";
+    if(d.mediciones&&d.mediciones.numMediciones>0){
+      var med=d.mediciones;
+      var vsCat=med.variacionVsCatalogo;
+      var vsCatColor="#555";
+      var vsCatTxt="—";
+      if(vsCat!==null){
+        if(vsCat<=-5){vsCatColor="#0F6E56";vsCatTxt=vsCat.toFixed(1)+"% (más rápido)";}
+        else if(vsCat>=5){vsCatColor="#A32D2D";vsCatTxt="+"+vsCat.toFixed(1)+"% (más lento)";}
+        else{vsCatColor="#0C447C";vsCatTxt=(vsCat>=0?"+":"")+vsCat.toFixed(1)+"% (consistente)";}
+      }
+      medBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px;border-left:3px solid #185FA5">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">'
+        +'<p style="font-size:13px;color:#333;font-weight:700;margin:0">🔬 Tiempos de ciclo medidos</p>'
+        +'<span style="font-size:11px;color:#888">'+med.numMediciones+' medición'+(med.numMediciones>1?'es':'')+'</span>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
+        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
+        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">CATÁLOGO</div>'
+        +'<div style="font-size:16px;font-weight:700;color:#185FA5">'+(med.catalogo!==null?med.catalogo.toFixed(2):'—')+' min</div></div>'
+        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
+        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">PROMEDIO</div>'
+        +'<div style="font-size:16px;font-weight:700;color:#1D9E75">'+med.promedio.toFixed(2)+' min</div></div>'
+        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
+        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">RANGO</div>'
+        +'<div style="font-size:12px;font-weight:700;color:#555">'+med.minimo.toFixed(2)+' – '+med.maximo.toFixed(2)+'</div></div>'
+        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
+        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">VS CATÁLOGO</div>'
+        +'<div style="font-size:12px;font-weight:700;color:'+vsCatColor+'">'+vsCatTxt+'</div></div>'
+        +'</div>'
+        +'<div style="max-height:220px;overflow-y:auto;background:#fff;border-radius:6px;border:1px solid #eee">'
+        +'<div style="display:grid;grid-template-columns:60px 1.4fr 1.2fr 60px 1fr;gap:6px;padding:8px 10px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:2px solid #eee;background:#f5f5f3;position:sticky;top:0">'
+        +'<div>FECHA</div><div>INGENIERO</div><div>MÁQUINA</div><div style="text-align:right">TC</div><div>OBS.</div></div>'
+        +med.mediciones.map(function(m){
+          return '<div style="display:grid;grid-template-columns:60px 1.4fr 1.2fr 60px 1fr;gap:6px;padding:6px 10px;font-size:12px;border-bottom:1px solid #f5f5f3">'
+            +'<div style="color:#333">'+_esc(m.fecha)+'</div>'
+            +'<div style="color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_esc(m.ingenieroNombre||"")+'">'+_esc(m.ingenieroNombre||m.ingeniero)+'</div>'
+            +'<div style="color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_esc(m.maquina||"—")+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#185FA5">'+m.tiempoCicloReal.toFixed(2)+'</div>'
+            +'<div style="color:#888;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_esc(m.observaciones||"")+'">'+_esc(m.observaciones||"—")+'</div>'
+            +'</div>';
+        }).join("")+'</div></div>';
+    }
+
+    body=selectors+kpiRow+tendBlock+omBlock+medBlock+nota;
   }
 
   return '<div id="mkmPiezaModalBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1005;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
@@ -2208,6 +2364,29 @@ function bindResumen(){
   });
   var bApR=document.getElementById("btnAplicarRangoPieza");
   if(bApR)bApR.addEventListener("click",aplicarRangoCustomModal);
+  // v11.14: Botón Buscar Parte + modal
+  var bBP=document.getElementById("btnBuscarParte");
+  if(bBP)bBP.addEventListener("click",abrirBusquedaParte);
+  var bBPCer=document.getElementById("btnCerrarBusqParte");
+  if(bBPCer)bBPCer.addEventListener("click",cerrarBusquedaParte);
+  var bgBP=document.getElementById("mkmBuscarParteBg");
+  if(bgBP)bgBP.addEventListener("click",function(e){if(e.target.id==="mkmBuscarParteBg")cerrarBusquedaParte();});
+  var bpInput=document.getElementById("mkmBusqParteInput");
+  if(bpInput){
+    var _bpTimer=null;
+    bpInput.addEventListener("input",function(){
+      var v=bpInput.value;
+      S.dashboard.busquedaQuery=v;
+      if(_bpTimer)clearTimeout(_bpTimer);
+      _bpTimer=setTimeout(function(){dashBuscarPartes(v);},300);
+    });
+    // Preservar foco
+    var l=bpInput.value.length;
+    try{bpInput.focus();bpInput.setSelectionRange(l,l);}catch(e){}
+  }
+  document.querySelectorAll(".mkm-busq-op-btn").forEach(function(el){
+    el.addEventListener("click",function(){dashSeleccionarParte(el.dataset.mkmNp,el.dataset.mkmOp);});
+  });
 }
 
 // ============================================================
@@ -2474,6 +2653,209 @@ function buildSetup(){
     +'<div class="field"><label>Horas de setup</label><input type="number" inputmode="decimal" class="num-input" placeholder="0.0" id="setupHoras" value="'+s.horas+'" step="0.5"></div></div>'
     +'<button class="send-btn" style="background:#185FA5" id="sendSetup"'+(S.sending?" disabled":"")+'>'+(S.sending?"Enviando...":"Enviar reporte de setup")+'</button>';
 }
+// ============================================================
+// v11.14 — Captura de Tiempo de Ciclo (Ingeniería)
+// ============================================================
+function buildTC(){
+  var t=S.tc;
+  var esDueno=S.esDueno;
+  // Turno automático según hora actual
+  var turnoActual=getTurno();
+  // Fecha automática
+  var hoy=new Date();
+  var fechaTxt=String(hoy.getDate()).padStart(2,"0")+"/"+String(hoy.getMonth()+1).padStart(2,"0")+"/"+hoy.getFullYear();
+
+  // --- 1. Selector de máquina ---
+  var maquinas=(CAT.maquinas||[]);
+  var maqOpts='<option value="">-- Selecciona máquina --</option>'
+    +maquinas.map(function(m){
+      var val=m.maquina||m;
+      var sel=t.maquina===val?"selected":"";
+      return '<option value="'+_esc(val)+'" '+sel+'>'+_esc(val)+'</option>';
+    }).join("");
+  var maquinaBox='<div class="field"><label>Máquina</label>'
+    +'<select id="tcMaquina" style="width:100%;padding:12px;font-size:15px;border-radius:8px;border:1px solid #ccc;background:#fff">'+maqOpts+'</select>'
+    +'</div>';
+
+  // --- 2. Búsqueda de parte ---
+  var busqBox='<div class="field"><label>Número de parte</label>'
+    +'<input type="text" id="tcBusqParte" placeholder="Escribe al menos 2 caracteres..." value="'+_esc(t.busquedaPartes)+'" style="width:100%;padding:12px;font-size:15px;border-radius:8px;border:1px solid #ccc" autocomplete="off">';
+  // Resultados de búsqueda
+  if(t.buscando){
+    busqBox+='<div style="padding:10px;color:#888;font-size:13px">Buscando...</div>';
+  }else if(t.resultadosBusqueda&&t.resultadosBusqueda.length>0){
+    busqBox+='<div style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;margin-top:6px;background:#fff">'
+      +t.resultadosBusqueda.map(function(r){
+        var sel=t.noParte===r.noParte?"background:#E1F5EE;":"";
+        return '<div class="tc-parte-row" data-mkm-parte="'+_esc(r.noParte)+'" data-mkm-ops="'+_esc((r.operaciones||[]).join(","))+'" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #f5f5f3;'+sel+'">'
+          +'<div style="font-weight:600;color:#222">'+_esc(r.noParte)+'</div>'
+          +'<div style="font-size:11px;color:#666">'+(r.operaciones||[]).length+' operación'+((r.operaciones||[]).length>1?'es':'')+': '+(r.operaciones||[]).join(", ")+'</div>'
+          +'</div>';
+      }).join("")+'</div>';
+  }else if(t.busquedaPartes&&t.busquedaPartes.length>=2){
+    busqBox+='<div style="padding:10px;color:#888;font-size:13px">Sin resultados</div>';
+  }
+  // Parte seleccionada
+  if(t.noParte){
+    busqBox+='<div style="margin-top:8px;padding:10px 12px;background:#E1F5EE;border-radius:8px;font-size:13px;color:#0F6E56;font-weight:600">✓ Seleccionado: '+_esc(t.noParte)+'</div>';
+  }
+  busqBox+='</div>';
+
+  // --- 3. Selector de operación (según parte) ---
+  var opBox="";
+  if(t.noParte){
+    var opsForPart=[];
+    // Buscar operaciones en el catálogo
+    var partes=CAT.partes||{};
+    if(partes[t.noParte]){
+      for(var op in partes[t.noParte])opsForPart.push(op);
+      opsForPart.sort();
+    }
+    var opOpts='<option value="">-- Selecciona operación --</option>'
+      +opsForPart.map(function(o){
+        var sel=t.operacion===o?"selected":"";
+        return '<option value="'+_esc(o)+'" '+sel+'>op '+_esc(o)+'</option>';
+      }).join("");
+    opBox='<div class="field"><label>Operación</label>'
+      +'<select id="tcOperacion" style="width:100%;padding:12px;font-size:15px;border-radius:8px;border:1px solid #ccc;background:#fff">'+opOpts+'</select>'
+      +'</div>';
+  }
+
+  // --- 4. Tiempo (min + seg) con preview ---
+  var mins=parseInt(t.minutos)||0;
+  var segs=parseInt(t.segundos)||0;
+  var totalMin=mins+(segs/60);
+  var previewTxt=(mins||segs)?'<div style="margin-top:8px;padding:8px 12px;background:#E6F1FB;border-radius:8px;font-size:14px;color:#0C447C;font-weight:600">= '+totalMin.toFixed(2)+' minutos</div>':'';
+  var tiempoBox='<div class="field"><label>Tiempo de ciclo real</label>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<input type="number" id="tcMinutos" placeholder="0" value="'+_esc(t.minutos)+'" min="0" max="999" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center" inputmode="numeric">'
+    +'<span style="font-size:14px;color:#666;font-weight:600">min</span>'
+    +'<input type="number" id="tcSegundos" placeholder="0" value="'+_esc(t.segundos)+'" min="0" max="59" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center" inputmode="numeric">'
+    +'<span style="font-size:14px;color:#666;font-weight:600">seg</span>'
+    +'</div>'
+    +previewTxt
+    +'</div>';
+
+  // --- 5. Observaciones (opcional) ---
+  var obsBox='<div class="field"><label>Observaciones (opcional)</label>'
+    +'<textarea id="tcObs" placeholder="Notas del estudio, condiciones, etc." rows="3" style="width:100%;padding:12px;font-size:14px;border-radius:8px;border:1px solid #ccc;resize:vertical;font-family:inherit">'+_esc(t.observaciones)+'</textarea>'
+    +'</div>';
+
+  // --- 6. Info del turno automático ---
+  var turnoBox='<div style="background:#F5F5F3;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#666">'
+    +'📅 Fecha: <b>'+fechaTxt+'</b> · Turno: <b>'+turnoActual+'</b>'
+    +'</div>';
+
+  // --- 7. Botón enviar ---
+  var canSubmit=t.maquina&&t.noParte&&t.operacion&&(mins>0||segs>0);
+  var enviarBtn='<button class="send-btn" id="sendTC" style="background:#1D9E75;color:#fff"'+((!canSubmit||t.guardando)?" disabled":"")+'>'+(t.guardando?"Guardando...":"Guardar medición")+'</button>';
+
+  // --- 8. Mensaje de éxito reciente ---
+  var exitoBox="";
+  if(t.exito){
+    exitoBox='<div style="background:#E1F5EE;color:#0F6E56;padding:12px;border-radius:8px;margin-bottom:14px;font-size:13px;font-weight:600">✓ Medición guardada correctamente</div>';
+  }
+
+  return '<div style="padding:16px 20px">'
+    +'<h2 style="font-size:18px;font-weight:700;margin:0 0 4px">🔬 Tiempo de Ciclo</h2>'
+    +'<p style="font-size:12px;color:#888;margin:0 0 16px">Registro de medición real por parte + operación en máquina</p>'
+    +exitoBox
+    +turnoBox
+    +maquinaBox
+    +busqBox
+    +opBox
+    +tiempoBox
+    +obsBox
+    +enviarBtn
+    +'</div>';
+}
+
+// Handlers TC
+function tcSetMaquina(v){S.tc.maquina=v;render();}
+function tcSetMinutos(v){S.tc.minutos=v;render();}
+function tcSetSegundos(v){S.tc.segundos=v;render();}
+function tcSetObs(v){S.tc.observaciones=v;}
+function tcBuscarPartes(q){
+  S.tc.busquedaPartes=q;
+  if(!q||q.length<2){
+    S.tc.resultadosBusqueda=[];
+    render();
+    return;
+  }
+  S.tc.buscando=true;
+  render();
+  apiGet({action:"buscarPartes",query:q})
+    .then(function(r){
+      S.tc.resultadosBusqueda=r.resultados||[];
+      S.tc.buscando=false;
+      render();
+    })
+    .catch(function(){
+      S.tc.resultadosBusqueda=[];
+      S.tc.buscando=false;
+      render();
+    });
+}
+function tcSeleccionarParte(np,opsStr){
+  S.tc.noParte=np;
+  S.tc.operacion="";
+  S.tc.resultadosBusqueda=[];
+  S.tc.busquedaPartes="";
+  render();
+}
+function tcSetOperacion(v){S.tc.operacion=v;render();}
+function tcEnviar(){
+  var t=S.tc;
+  var mins=parseInt(t.minutos)||0;
+  var segs=parseInt(t.segundos)||0;
+  if(!t.maquina||!t.noParte||!t.operacion||(mins===0&&segs===0)){
+    alert("Faltan datos: máquina, parte, operación y tiempo son obligatorios");
+    return;
+  }
+  if(segs>=60){alert("Los segundos deben ser menor a 60");return;}
+  var totalMin=mins+(segs/60);
+  var turnoActual=getTurno();
+  var hoy=new Date();
+  var fechaTxt=String(hoy.getDate()).padStart(2,"0")+"/"+String(hoy.getMonth()+1).padStart(2,"0")+"/"+hoy.getFullYear();
+  var emp=S.empleado;
+  var ingenieroStr=emp.numero+" - "+emp.nombre;
+
+  S.tc.guardando=true;
+  S.tc.exito=false;
+  render();
+
+  var payload={
+    tipo:"TiempoCiclo",
+    fecha:fechaTxt,
+    turno:turnoActual,
+    ingeniero:ingenieroStr,
+    maquina:t.maquina,
+    noParte:t.noParte,
+    operacion:t.operacion,
+    tiempoCicloReal:Math.round(totalMin*100)/100,
+    observaciones:t.observaciones||""
+  };
+  apiPost(payload)
+    .then(function(){
+      // Limpiar formulario, dejar máquina para captura consecutiva
+      S.tc.noParte="";
+      S.tc.operacion="";
+      S.tc.minutos="";
+      S.tc.segundos="";
+      S.tc.observaciones="";
+      S.tc.exito=true;
+      S.tc.guardando=false;
+      render();
+      // Ocultar mensaje de éxito después de 4 segundos
+      setTimeout(function(){S.tc.exito=false;render();},4000);
+    })
+    .catch(function(err){
+      S.tc.guardando=false;
+      alert("Error al guardar: "+(err.message||"desconocido"));
+      render();
+    });
+}
+
 function buildManto(){
   var m=S.manto;
   var btns=tiposMantoPrincipales().map(function(t){return'<button class="big-btn'+(m.tipo===t?" active":"")+'\" data-manto="'+t+'">'+t+'</button>';}).join("");
@@ -2511,6 +2893,8 @@ function buildMain(){
   // Tab Manto solo para jefe de manto y dueño (reporta horas reales de máquina parada)
   // Tab Manto: jefe de manto, dueño, o supervisor con permiso de reportar manto
   if(emp.esManto||S.esDueno||emp.puedeReportarManto)tabsArr.push({id:"manto",label:"Manto"});
+  // v11.14: Tab TC solo para ingeniería
+  if(emp.esIngenieria||S.esDueno)tabsArr.push({id:"tc",label:"TC"});
   tabsArr.push({id:"solicitudes",label:"Solicitudes"});
   tabsArr.push({id:"miturno",label:"Mi turno"});
 
@@ -2522,6 +2906,7 @@ function buildMain(){
   if(S.tab==="produccion")body=buildProd();
   else if(S.tab==="setup")body=buildSetup();
   else if(S.tab==="manto")body=buildManto();
+  else if(S.tab==="tc")body=buildTC();
   else if(S.tab==="miturno")body=buildMiTurno();
   else if(S.tab==="solicitudes")body=buildSolicitudes();
   return header+tabsHtml+body;
@@ -2853,6 +3238,34 @@ function bindMain(){
   var mh=document.getElementById("mantoHoras");if(mh)mh.addEventListener("input",function(){S.manto.horas=mh.value;});
   document.querySelectorAll("[data-manto]").forEach(function(el){el.addEventListener("click",function(){selManto(el.dataset.manto);});});
   document.querySelectorAll("[data-mantosub]").forEach(function(el){el.addEventListener("click",function(){selMantoSub(el.dataset.mantosub);});});
+
+  // v11.14: TC (Tiempo de Ciclo - Ingeniería)
+  var tcM=document.getElementById("tcMaquina");
+  if(tcM)tcM.addEventListener("change",function(){tcSetMaquina(tcM.value);});
+  var tcB=document.getElementById("tcBusqParte");
+  if(tcB){
+    // Debounce simple para no llamar backend en cada tecla
+    var _tcTimer=null;
+    tcB.addEventListener("input",function(){
+      var v=tcB.value;
+      S.tc.busquedaPartes=v;
+      if(_tcTimer)clearTimeout(_tcTimer);
+      _tcTimer=setTimeout(function(){tcBuscarPartes(v);},300);
+    });
+  }
+  document.querySelectorAll(".tc-parte-row").forEach(function(el){
+    el.addEventListener("click",function(){tcSeleccionarParte(el.dataset.mkmParte,el.dataset.mkmOps);});
+  });
+  var tcOp=document.getElementById("tcOperacion");
+  if(tcOp)tcOp.addEventListener("change",function(){tcSetOperacion(tcOp.value);});
+  var tcMin=document.getElementById("tcMinutos");
+  if(tcMin)tcMin.addEventListener("input",function(){tcSetMinutos(tcMin.value);});
+  var tcSeg=document.getElementById("tcSegundos");
+  if(tcSeg)tcSeg.addEventListener("input",function(){tcSetSegundos(tcSeg.value);});
+  var tcObs=document.getElementById("tcObs");
+  if(tcObs)tcObs.addEventListener("input",function(){tcSetObs(tcObs.value);});
+  var tcSend=document.getElementById("sendTC");
+  if(tcSend)tcSend.addEventListener("click",tcEnviar);
 
   // MI TURNO
   var mt1=document.getElementById("mt1");if(mt1)mt1.addEventListener("click",function(){S.miturno.turno="1ro";render();});
