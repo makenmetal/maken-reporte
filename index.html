@@ -168,7 +168,7 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  // Dashboard de eficiencia por máquina (v11.2)
+  // Dashboard de eficiencia por máquina (v11.7)
   dashboard:{
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
     area:"all",          // "all" | nombre de área
@@ -183,6 +183,8 @@ var S = {
     selectorMaqOpen:false,
     selectorMaqBusqueda:"",
     selectorMaqSeleccion:[],  // selección temporal antes de aplicar
+    // Modal de manual/ayuda con reglas y fórmulas
+    ayudaOpen:false,
     loading:false,
     data:null,
     // Modal de máquina expandida
@@ -400,6 +402,15 @@ function abrirModalMaquina(maq){
 }
 function cerrarModalMaquina(){
   S.dashboard.maqModal={maquina:"",loading:false,data:null};
+  render();
+}
+// --- Modal de ayuda / manual ---
+function abrirAyudaDash(){
+  S.dashboard.ayudaOpen=true;
+  render();
+}
+function cerrarAyudaDash(){
+  S.dashboard.ayudaOpen=false;
   render();
 }
 // --- Selector múltiple de máquinas ---
@@ -1007,10 +1018,23 @@ function buildDashboard(){
     +'</div>';
 
   // --- Grid de tarjetas por máquina ---
+  // v11.6: Sort robusto ante eff === null (máquinas N/A van al final)
   var cards=(data.cards||[]).slice();
-  if(d.orden==="eff-desc")cards.sort(function(a,b){return b.eff-a.eff;});
-  else if(d.orden==="eff-asc")cards.sort(function(a,b){return a.eff-b.eff;});
-  else cards.sort(function(a,b){return b.piezas-a.piezas;});
+  var _sortEffDesc=function(a,b){
+    if(a.eff===null&&b.eff===null)return 0;
+    if(a.eff===null)return 1;   // NA al final
+    if(b.eff===null)return -1;
+    return b.eff-a.eff;
+  };
+  var _sortEffAsc=function(a,b){
+    if(a.eff===null&&b.eff===null)return 0;
+    if(a.eff===null)return 1;   // NA al final
+    if(b.eff===null)return -1;
+    return a.eff-b.eff;
+  };
+  if(d.orden==="eff-desc")cards.sort(_sortEffDesc);
+  else if(d.orden==="eff-asc")cards.sort(_sortEffAsc);
+  else cards.sort(function(a,b){return (b.piezas||0)-(a.piezas||0);});
 
   var grid='';
   if(cards.length===0){
@@ -1029,8 +1053,13 @@ function buildDashboard(){
   if(d.selectorMaqOpen){
     selectorModal=buildSelectorMaquinasModal();
   }
+  // --- Modal de ayuda / manual (v11.7) ---
+  var ayudaModal="";
+  if(d.ayudaOpen){
+    ayudaModal=buildAyudaDashModal();
+  }
 
-  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal+selectorModal;
+  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal+selectorModal+ayudaModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1038,21 +1067,26 @@ function wrapDashboard(content,periodoLabel){
     +'<div class="mkm-dash-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
-    +'<div><button class="refresh-btn" id="btnRefreshDash" style="margin-right:8px">↻</button>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
+    +'<button class="refresh-btn" id="btnRefreshDash">↻</button>'
     +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div></div>'
     +content
     +'</div>';
 }
 
-function dashKpi(label,valor,color){
+function dashKpi(label,valor,color,subnota){
+  var sub=subnota?'<p style="font-size:9px;color:#7A2E2E;margin-top:2px;font-weight:600">'+subnota+'</p>':'';
   return'<div style="background:#fff;border-radius:8px;padding:10px 6px;text-align:center;border:1px solid #eee">'
     +'<p style="font-size:9px;color:#888;font-weight:600;margin-bottom:3px;letter-spacing:0.5px">'+label+'</p>'
-    +'<p style="font-size:17px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p></div>';
+    +'<p style="font-size:17px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p>'
+    +sub
+    +'</div>';
 }
 
 // Tarjeta individual por máquina
 function dashMaqCard(c){
-  // Caso especial: máquina sin actividad en el periodo
+  // Caso especial 1: máquina sin actividad en el periodo (seleccionada pero sin reportes)
   if(c.sinActividad){
     return '<div class="mkm-mach-card mkm-mach-empty" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fafaf9;border-radius:12px;border:1px dashed #ddd;padding:14px 16px;margin-bottom:12px;cursor:pointer;opacity:0.7">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
@@ -1061,12 +1095,17 @@ function dashMaqCard(c){
       +'</div>'
       +'<div style="font-size:11px;color:#aaa;margin-bottom:16px">'+_esc(c.area||"")+'</div>'
       +'<div style="text-align:center;padding:14px 0;border-radius:8px;background:#f5f5f3">'
-      +'<div style="font-size:36px;font-weight:600;color:#bbb;line-height:1;letter-spacing:-1px">—</div>'
-      +'<div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px">SIN REPORTES EN EL PERIODO</div>'
+      +'<div style="font-size:36px;font-weight:600;color:#bbb;line-height:1;letter-spacing:-1px">0%</div>'
+      +'<div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px">SIN REPORTES EN PERIODO</div>'
       +'</div></div>';
   }
 
-  var col=_effColor(c.eff);
+  // Caso especial 2: máquina con manto ≥ 90% del total → N/A (excluida del global)
+  var esNA = (c.eff === null);
+
+  var col = esNA
+    ? { bg: "#FBECEC", fg: "#7A2E2E" }  // Rojizo suave para N/A por manto
+    : _effColor(c.eff);
   var total=c.totalHrs||0.001;
   var pP=(c.hProd/total*100);
   var pS=(c.hSet/total*100);
@@ -1126,11 +1165,17 @@ function dashMaqCard(c){
   // Turnos presentes (ej: "1ro · 3ro")
   var turnosStr=(c.turnosPresentes&&c.turnosPresentes.length)?c.turnosPresentes.join(" · "):c.turnos+" turno"+(c.turnos>1?'s':'');
 
-  // Info adicional de disponibilidad si hay manto
+  // Info adicional: solo se muestra la nota crítica de N/A cuando aplica.
+  // La explicación de la fórmula está en el modal de Manual (botón ? en header).
   var infoDisp='';
-  if((c.hManto||0)>0){
-    infoDisp='<div style="font-size:10px;color:#888;margin-top:-4px;margin-bottom:6px">Base para eficiencia: '+(c.hDisponible||c.totalHrs).toFixed(1)+'h disponibles (9.5h × '+c.turnos+' turnos − '+c.hManto.toFixed(1)+'h manto)</div>';
+  if(esNA){
+    infoDisp='<div style="font-size:10px;color:#7A2E2E;margin-top:-4px;margin-bottom:6px;font-weight:600">Máquina prácticamente todo el periodo en manto ('+c.hManto.toFixed(1)+'h de '+c.totalHrs.toFixed(1)+'h).</div>';
   }
+
+  // Valor de eficiencia grande: número o "N/A"
+  var effValor = esNA ? 'N/A' : (c.eff + '%');
+  var effLabel = esNA ? 'NO APLICA · MANTO ≥ 90%' : 'EFICIENCIA';
+  var effFontSize = esNA ? '30px' : '36px';
 
   return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
     +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
@@ -1139,8 +1184,8 @@ function dashMaqCard(c){
     +'</div>'
     +'<div style="font-size:11px;color:#888;margin-bottom:12px">'+_esc(c.area||"")+'</div>'
     +'<div style="text-align:center;padding:10px 0;margin-bottom:12px;border-radius:8px;background:'+col.bg+'">'
-    +'<div style="font-size:36px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+c.eff+'%</div>'
-    +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">EFICIENCIA</div>'
+    +'<div style="font-size:'+effFontSize+';font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+effValor+'</div>'
+    +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">'+effLabel+'</div>'
     +'</div>'
     +infoDisp
     +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
@@ -1162,12 +1207,19 @@ function buildMaquinaModal(){
   }else{
     var d=mm.data;
     var res=d.resumen||{};
-    var col=_effColor(res.eff||0);
+    var esNAModal = (res.eff === null);
+    var col = esNAModal
+      ? { bg: "#FBECEC", fg: "#7A2E2E" }
+      : _effColor(res.eff||0);
+    var effTxtModal = esNAModal ? 'N/A' : (res.eff||0)+'%';
+    var effLblModal = esNAModal
+      ? 'NO APLICA · MANTO ≥ 90%'
+      : 'EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas';
 
     // Header con eficiencia grande
     var header='<div style="text-align:center;padding:14px 0;margin-bottom:14px;border-radius:10px;background:'+col.bg+'">'
-      +'<div style="font-size:44px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+(res.eff||0)+'%</div>'
-      +'<div style="font-size:11px;color:'+col.fg+';margin-top:5px;letter-spacing:0.5px">EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas</div>'
+      +'<div style="font-size:44px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+effTxtModal+'</div>'
+      +'<div style="font-size:11px;color:'+col.fg+';margin-top:5px;letter-spacing:0.5px">'+effLblModal+'</div>'
       +'</div>';
 
     // Gráfica de tendencia SVG
@@ -1238,16 +1290,33 @@ function buildMaquinaModal(){
 // SVG helper: gráfica de línea simple
 function _svgLineChart(data,valKey,labelKey,w,h){
   if(!data||data.length===0)return'<p style="color:#aaa;font-size:12px">Sin datos</p>';
+  // v11.6: Separar puntos válidos de N/A (día con manto ≥ 90%)
+  // Los N/A no se grafican en la línea pero sí se muestran como marcas grises abajo
   var pad={top:12,right:8,bottom:24,left:28};
   var innerW=w-pad.left-pad.right;
   var innerH=h-pad.top-pad.bottom;
-  var maxV=Math.max(100,Math.ceil(Math.max.apply(null,data.map(function(d){return d[valKey]||0;}))/10)*10);
+  var validValues=data.filter(function(d){return d[valKey]!==null;}).map(function(d){return d[valKey]||0;});
+  var maxV=Math.max(100,Math.ceil((validValues.length>0?Math.max.apply(null,validValues):100)/10)*10);
   var pts=data.map(function(d,i){
     var x=pad.left+(data.length===1?innerW/2:i/(data.length-1)*innerW);
-    var y=pad.top+innerH-((d[valKey]||0)/maxV)*innerH;
-    return{x:x,y:y,d:d};
+    var esNA=(d[valKey]===null);
+    var y=esNA?null:(pad.top+innerH-((d[valKey]||0)/maxV)*innerH);
+    return{x:x,y:y,d:d,esNA:esNA};
   });
-  var polyline=pts.map(function(p){return p.x+","+p.y;}).join(" ");
+  // Polyline solo con puntos válidos (crea segmentos separados si hay N/A entre medias)
+  var segments=[];
+  var current=[];
+  pts.forEach(function(p){
+    if(p.esNA){
+      if(current.length>0){segments.push(current);current=[];}
+    }else{
+      current.push(p.x+","+p.y);
+    }
+  });
+  if(current.length>0)segments.push(current);
+  var polylines=segments.map(function(seg){
+    return '<polyline points="'+seg.join(" ")+'" fill="none" stroke="#1D9E75" stroke-width="2"/>';
+  }).join("");
   // Grid lines cada 25
   var gridLines="";
   for(var g=0;g<=maxV;g+=25){
@@ -1257,6 +1326,10 @@ function _svgLineChart(data,valKey,labelKey,w,h){
   }
   var line100='<line x1="'+pad.left+'" y1="'+(pad.top+innerH-(100/maxV)*innerH)+'" x2="'+(w-pad.right)+'" y2="'+(pad.top+innerH-(100/maxV)*innerH)+'" stroke="#1D9E75" stroke-width="1" stroke-dasharray="3,3"/>';
   var dots=pts.map(function(p){
+    if(p.esNA){
+      // Marca gris pequeña en la base para indicar "día N/A"
+      return '<circle cx="'+p.x+'" cy="'+(pad.top+innerH+2)+'" r="3" fill="#bbb" stroke="#999" stroke-width="1"/>';
+    }
     var col=_effColor(p.d[valKey]||0);
     return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="'+col.fg+'"/>';
   }).join("");
@@ -1266,7 +1339,7 @@ function _svgLineChart(data,valKey,labelKey,w,h){
   }).join("");
   return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="max-width:'+w+'px;display:block;margin:0 auto">'
     +gridLines+line100
-    +'<polyline points="'+polyline+'" fill="none" stroke="#1D9E75" stroke-width="2"/>'
+    +polylines
     +dots+labels
     +'</svg>';
 }
@@ -1279,6 +1352,126 @@ function _distrRow(color,lbl,val,pct){
 }
 
 function _esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// Modal de ayuda / manual — documenta reglas y fórmulas del dashboard
+function buildAyudaDashModal(){
+  // Componente helper: sección con título y contenido
+  var sec=function(titulo,contenido){
+    return '<div style="margin-bottom:20px">'
+      +'<h3 style="font-size:14px;font-weight:700;color:#1D9E75;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid #E1F5EE">'+titulo+'</h3>'
+      +contenido
+      +'</div>';
+  };
+  // Componente helper: caja con fórmula
+  var formula=function(txt){
+    return '<div style="background:#F5F5F3;border-left:3px solid #1D9E75;padding:10px 12px;margin:8px 0;border-radius:4px;font-family:monospace;font-size:12px;color:#333;line-height:1.5">'+txt+'</div>';
+  };
+  // Componente helper: item con color box
+  var catItem=function(color,titulo,desc){
+    return '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start">'
+      +'<div style="width:14px;height:14px;border-radius:3px;background:'+color+';flex-shrink:0;margin-top:2px"></div>'
+      +'<div style="flex:1"><div style="font-weight:600;font-size:12px;color:#222">'+titulo+'</div><div style="font-size:11px;color:#666;line-height:1.4">'+desc+'</div></div>'
+      +'</div>';
+  };
+  // Componente helper: regla numerada
+  var regla=function(num,titulo,desc){
+    return '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start">'
+      +'<div style="width:22px;height:22px;border-radius:50%;background:#1D9E75;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+num+'</div>'
+      +'<div style="flex:1"><div style="font-weight:600;font-size:12px;color:#222;margin-bottom:2px">'+titulo+'</div><div style="font-size:11px;color:#555;line-height:1.5">'+desc+'</div></div>'
+      +'</div>';
+  };
+
+  // --- Contenido ---
+  var body="";
+
+  // Sección 1: Turno
+  body+=sec("Turno de trabajo",
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">MAKEN opera <b>2 turnos</b> de <b>9.5 horas efectivas</b> cada uno:</p>'
+    +'<ul style="font-size:12px;color:#555;line-height:1.6;margin:4px 0;padding-left:20px">'
+    +'<li><b>1er turno</b>: cubre el día</li>'
+    +'<li><b>3er turno</b>: cubre la noche</li>'
+    +'</ul>'
+    +'<p style="font-size:11px;color:#888;margin-top:6px">Ejemplo: máquina con reportes en 1ro y 3ro del mismo día → <b>19h totales</b> (9.5h × 2).</p>'
+  );
+
+  // Sección 2: Fórmula
+  body+=sec("Cálculo de la eficiencia",
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">La eficiencia mide qué tan bien se usó el tiempo <b>realmente disponible</b> para producir.</p>'
+    +formula("Eficiencia % = (Horas de Producción / Horas Disponibles) × 100")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas de Producción</b> se calculan por cada reporte:</p>'
+    +formula("Horas Producción = (Piezas × TiempoCiclo del catálogo) / 60")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Disponibles</b> descuentan el manto (porque la máquina no estaba operativa):</p>'
+    +formula("Horas Disponibles = (9.5h × N° turnos) − Horas Manto")
+    +'<p style="font-size:11px;color:#888;margin-top:8px">Ejemplo: máquina con 2 turnos (19h), 3h de manto, produjo 12h estándar → <b>Eficiencia = 12/(19−3) = 75%</b></p>'
+  );
+
+  // Sección 3: Composición de las 9.5h
+  body+=sec("Distribución de las 9.5 horas por turno",
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 10px">Cada turno se compone de estas 5 categorías (la barra de colores en cada tarjeta):</p>'
+    +catItem("#1D9E75","Producción","Tiempo estándar equivalente a las piezas producidas.")
+    +catItem("#888780","Montaje","Horas de setup hasta <b>1.5h</b> por reporte. Es tiempo operativo/necesario, NO penaliza.")
+    +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. Se contabilizan como tiempo perdido.")
+    +catItem("#D4544E","Manto","Horas registradas en reportes tipo Mantenimiento. Se <b>descuentan del denominador</b>.")
+    +catItem("#F0997B","Ocioso","Horas sin justificar: 9.5h menos todo lo anterior. Refleja tiempo muerto o subutilizado.")
+  );
+
+  // Sección 4: Reglas de N/A
+  body+=sec("Cuándo la eficiencia es N/A (no aplica)",
+    regla("1","Máquina con manto ≥ 90% del tiempo",
+      "Si el manto consume 90% o más de las horas totales, la máquina no tuvo tiempo real para producir. Su eficiencia se marca como <b>N/A</b> y se <b>excluye del promedio global</b>.")
+    +regla("2","Máquina seleccionada sin reportes",
+      "Si seleccionas una máquina y no tiene actividad en el periodo, cuenta como <b>0%</b> y <b>penaliza el promedio</b>. La tarjeta se ve gris con la nota 'SIN REPORTES'.")
+    +regla("3","Reporte sin estándar en catálogo",
+      "Si una parte + operación no tiene TiempoCiclo en el catálogo, ese reporte aparece en la lista con badge <b>'SIN ESTÁNDAR'</b>. Sus piezas se muestran pero no cuentan en el cálculo de horas de producción.")
+  );
+
+  // Sección 5: Consolidación global
+  body+=sec("Cálculo del promedio global (EFIC GLOBAL)",
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 8px">El indicador <b>EFIC GLOBAL</b> es el promedio simple de las eficiencias individuales:</p>'
+    +formula("EFIC GLOBAL = Promedio de las eficiencias válidas")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px">Reglas de conteo:</p>'
+    +'<ul style="font-size:12px;color:#555;line-height:1.6;margin:4px 0;padding-left:20px">'
+    +'<li>Máquinas productivas → cuentan con su valor</li>'
+    +'<li>Máquinas con 0% (sin actividad) → <b>cuentan como 0</b> (penalizan)</li>'
+    +'<li>Máquinas N/A (manto ≥ 90%) → <b>excluidas</b> del promedio</li>'
+    +'</ul>'
+    +'<p style="font-size:11px;color:#888;margin-top:8px">Cuando hay excluidas, se muestra debajo del número: <span style="color:#7A2E2E;font-weight:600">"excluye N N/A"</span></p>'
+    +'<p style="font-size:11px;color:#666;margin-top:8px">Ejemplo con 3 máquinas: A=90%, B=0%, C=N/A → EFIC GLOBAL = (90+0)/2 = <b>45%</b></p>'
+  );
+
+  // Sección 6: Colores del indicador
+  body+=sec("Códigos de color de la eficiencia",
+    catItem("#FCEBEB","Rojo (menos de 60%)","Eficiencia crítica. Requiere atención inmediata.")
+    +catItem("#FAEEDA","Ámbar (60% a 79%)","Eficiencia por debajo del objetivo. Revisar causas.")
+    +catItem("#E1F5EE","Verde (80% a 99%)","Eficiencia dentro del objetivo esperado.")
+    +catItem("#E6F1FB","Azul (100% o más)","Sobreproducción. Revisar si el estándar está actualizado o hubo condiciones excepcionales.")
+    +catItem("#FBECEC","Rojizo (N/A)","Manto crítico. La máquina no operó lo suficiente para calcular eficiencia.")
+  );
+
+  // Sección 7: Filtros
+  body+=sec("Filtros disponibles",
+    '<ul style="font-size:12px;color:#555;line-height:1.7;margin:0;padding-left:20px">'
+    +'<li><b>Periodo</b>: Hoy / Semana (lun-hoy) / Mes (1° del mes-hoy) / Rango personalizado</li>'
+    +'<li><b>Máquinas</b>: si seleccionas máquinas específicas, el filtro de área se ignora</li>'
+    +'<li><b>Área</b>: filtra las máquinas del catálogo por área</li>'
+    +'<li><b>Turno</b>: filtra reportes por turno específico o suma ambos</li>'
+    +'<li><b>Orden</b>: eficiencia descendente/ascendente o piezas descendente (las N/A siempre al final)</li>'
+    +'</ul>'
+  );
+
+  return '<div id="mkmAyudaBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1002;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:600px;width:100%;margin-top:20px;padding:20px 22px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee">'
+    +'<div><div style="font-size:17px;font-weight:700">Manual del Dashboard</div>'
+    +'<div style="font-size:11px;color:#888">Reglas y fórmulas de cálculo</div></div>'
+    +'<button id="btnCerrarAyudaDash" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'<div style="text-align:center;padding-top:12px;border-top:1px solid #eee;margin-top:8px">'
+    +'<button id="btnCerrarAyudaDash2" style="padding:10px 24px;font-size:13px;font-weight:600;border:none;border-radius:8px;background:#1D9E75;color:#fff;cursor:pointer">Entendido</button>'
+    +'</div>'
+    +'</div></div>';
+}
 
 // Modal para selector múltiple de máquinas
 function buildSelectorMaquinasModal(){
@@ -1445,6 +1638,15 @@ function bindResumen(){
   if(bCer)bCer.addEventListener("click",cerrarModalMaquina);
   var bg=document.getElementById("mkmMaqModalBg");
   if(bg)bg.addEventListener("click",function(e){if(e.target.id==="mkmMaqModalBg")cerrarModalMaquina();});
+  // --- Modal Ayuda / Manual (v11.7) ---
+  var bAyu=document.getElementById("btnAyudaDash");
+  if(bAyu)bAyu.addEventListener("click",abrirAyudaDash);
+  var bAyuCer=document.getElementById("btnCerrarAyudaDash");
+  if(bAyuCer)bAyuCer.addEventListener("click",cerrarAyudaDash);
+  var bAyuCer2=document.getElementById("btnCerrarAyudaDash2");
+  if(bAyuCer2)bAyuCer2.addEventListener("click",cerrarAyudaDash);
+  var bgAyu=document.getElementById("mkmAyudaBg");
+  if(bgAyu)bgAyu.addEventListener("click",function(e){if(e.target.id==="mkmAyudaBg")cerrarAyudaDash();});
 }
 
 // ============================================================
