@@ -109,6 +109,67 @@ textarea { resize: vertical; min-height: 90px; font-size: 16px; }
     gap: 20px;
   }
 }
+
+/* ============================================================
+   IMPRESIÓN / EXPORTAR A PDF (v11.8)
+============================================================ */
+@media print {
+  /* Ocultar todo lo interactivo */
+  .mkm-header-buttons,
+  #btnRefreshDash, #btnSalirRes, #btnAyudaDash, #btnExportarPDF,
+  #dashArea, #btnAbrirSelMaq, #btnLimpiarMaqSel,
+  #mkmMaqModalBg, #mkmSelMaqBg, #mkmAyudaBg {
+    display: none !important;
+  }
+  /* Ocultar filtros y ordenamiento */
+  #pseg, #sseg, .mkm-controls, [data-dperiod], [data-dturno], [data-dord] {
+    display: none !important;
+  }
+  /* Layout impresión */
+  body { background: white !important; }
+  .wrap { max-width: none !important; padding: 0 !important; }
+  .mkm-dash-wrap {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .mkm-dash-header {
+    margin-bottom: 12px !important;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #333;
+  }
+  /* Grid en 2 columnas en impresión, un poco más compactas */
+  .mkm-dash-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  /* Cada tarjeta que no se corte entre páginas */
+  .mkm-mach-card, .mkm-resumen-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    margin-bottom: 8px !important;
+  }
+  /* Tarjeta resumen ancho completo en impresión */
+  .mkm-resumen-card {
+    grid-column: 1 / -1;
+  }
+  /* Sin hover en impresión */
+  .mkm-mach-card:hover, .mkm-mach-empty:hover {
+    border-color: #ccc !important;
+    box-shadow: none !important;
+  }
+  /* Que la fila de filtros no aparezca */
+  form, input, select, button {
+    display: none !important;
+  }
+  /* Reactivar el título del dashboard */
+  .mkm-dash-header > div:first-child {
+    display: block !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -412,6 +473,27 @@ function abrirAyudaDash(){
 function cerrarAyudaDash(){
   S.dashboard.ayudaOpen=false;
   render();
+}
+// --- Exportar dashboard a PDF (usa impresión nativa del navegador) ---
+function exportarDashboardPDF(){
+  // Cerrar cualquier modal abierto para que no se imprima encima
+  var mm=S.dashboard.maqModal;
+  var reAbrirMaqModal=false;
+  if(mm&&mm.maquina){
+    reAbrirMaqModal=mm.maquina;
+    S.dashboard.maqModal={maquina:"",loading:false,data:null};
+  }
+  if(S.dashboard.selectorMaqOpen)S.dashboard.selectorMaqOpen=false;
+  if(S.dashboard.ayudaOpen)S.dashboard.ayudaOpen=false;
+  render();
+  // Pequeño delay para que el DOM se actualice antes del print
+  setTimeout(function(){
+    window.print();
+    // Restaurar modal si estaba abierto
+    if(reAbrirMaqModal){
+      setTimeout(function(){abrirModalMaquina(reAbrirMaqModal);},200);
+    }
+  },100);
 }
 // --- Selector múltiple de máquinas ---
 function cargarCatalogoMaquinas(){
@@ -1036,6 +1118,9 @@ function buildDashboard(){
   else if(d.orden==="eff-asc")cards.sort(_sortEffAsc);
   else cards.sort(function(a,b){return (b.piezas||0)-(a.piezas||0);});
 
+  // v11.8: Tarjeta resumen consolidado (encabezado sobre las tarjetas individuales)
+  var resumenCard=dashResumenCard(data,cards);
+
   var grid='';
   if(cards.length===0){
     grid='<div style="background:#f8fafc;border-radius:10px;padding:40px 20px;text-align:center;color:#888;font-size:13px">Sin actividad en el filtro seleccionado</div>';
@@ -1059,7 +1144,7 @@ function buildDashboard(){
     ayudaModal=buildAyudaDashModal();
   }
 
-  return wrapDashboard(controles+kpis+grid,periodoLabel)+modal+selectorModal+ayudaModal;
+  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+selectorModal+ayudaModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1067,7 +1152,8 @@ function wrapDashboard(content,periodoLabel){
     +'<div class="mkm-dash-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
-    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<div style="display:flex;align-items:center;gap:6px" class="mkm-header-buttons">'
+    +'<button id="btnExportarPDF" style="font-size:14px;background:#E6F1FB;border:1px solid #B4D3EE;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0C447C;font-weight:600" title="Exportar / Imprimir como PDF">📄 PDF</button>'
     +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
     +'<button class="refresh-btn" id="btnRefreshDash">↻</button>'
     +'<button style="font-size:13px;color:#E24B4A;background:none;border:none;cursor:pointer;padding:8px" id="btnSalirRes">Salir</button></div></div>'
@@ -1081,6 +1167,80 @@ function dashKpi(label,valor,color,subnota){
     +'<p style="font-size:9px;color:#888;font-weight:600;margin-bottom:3px;letter-spacing:0.5px">'+label+'</p>'
     +'<p style="font-size:17px;font-weight:700;color:'+color+';line-height:1">'+valor+'</p>'
     +sub
+    +'</div>';
+}
+
+// Tarjeta resumen consolidado — muestra el total agregado de todas las máquinas seleccionadas
+function dashResumenCard(data,cards){
+  if(!data||!cards||cards.length===0)return"";
+
+  // Sumar todas las horas de todas las tarjetas (incluye N/A para reflejar tiempo real usado)
+  var totalHrs=0,totalHProd=0,totalHSet=0,totalHOver=0,totalHManto=0,totalHIdle=0,totalPiezas=0;
+  cards.forEach(function(c){
+    totalHrs+=c.totalHrs||0;
+    totalHProd+=c.hProd||0;
+    totalHSet+=c.hSet||0;
+    totalHOver+=c.hOver||0;
+    totalHManto+=c.hManto||0;
+    totalHIdle+=c.hIdle||0;
+    totalPiezas+=c.piezas||0;
+  });
+
+  var effGlobal=data.effGlobal||0;
+  var col=_effColor(effGlobal);
+  var nMaq=cards.length;
+  var nManto=data.numMaquinasEnManto||0;
+  var nContadas=data.numMaquinasContadas||nMaq;
+
+  var total=Math.max(totalHrs,0.001);
+  var pP=(totalHProd/total*100);
+  var pS=(totalHSet/total*100);
+  var pO=(totalHOver/total*100);
+  var pM=(totalHManto/total*100);
+  var pI=(totalHIdle/total*100);
+  var COL_PROD="#1D9E75",COL_SET="#888780",COL_OVER="#EF9F27",COL_MANTO="#D4544E",COL_IDLE="#F0997B";
+
+  var bar='<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#f5f5f3;margin-bottom:10px">'
+    +(pP>0?'<div style="width:'+pP+'%;background:'+COL_PROD+'"></div>':'')
+    +(pS>0?'<div style="width:'+pS+'%;background:'+COL_SET+'"></div>':'')
+    +(pO>0?'<div style="width:'+pO+'%;background:'+COL_OVER+'"></div>':'')
+    +(pM>0?'<div style="width:'+pM+'%;background:'+COL_MANTO+'"></div>':'')
+    +(pI>0?'<div style="width:'+pI+'%;background:'+COL_IDLE+'"></div>':'')
+    +'</div>';
+
+  var legendRow=function(color,lbl,val,pct){
+    return '<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="display:flex;align-items:center;gap:6px;color:#666;font-size:12px"><span style="width:9px;height:9px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
+      +'<span style="font-size:12px;color:#222"><span style="font-weight:600">'+val.toFixed(1)+'h</span> <span style="color:#888">('+Math.round(pct)+'%)</span></span></div>';
+  };
+  var legend='<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 14px">'
+    +legendRow(COL_PROD,"Producción",totalHProd,pP)
+    +legendRow(COL_SET,"Montaje",totalHSet,pS)
+    +legendRow(COL_OVER,"Sobre-setup",totalHOver,pO)
+    +legendRow(COL_MANTO,"Manto",totalHManto,pM)
+    +legendRow(COL_IDLE,"Ocioso",totalHIdle,pI)
+    +'</div>';
+
+  // Subtítulo: qué se está resumiendo
+  var subtitulo="";
+  if(data.maquinasFiltradas&&data.maquinasFiltradas.length>0){
+    subtitulo=nMaq+" máquina"+(nMaq>1?"s":"")+" seleccionada"+(nMaq>1?"s":"");
+  }else{
+    subtitulo=nMaq+" máquina"+(nMaq>1?"s":"")+" en el filtro";
+  }
+  if(nManto>0){
+    subtitulo+=' <span style="color:#7A2E2E;font-weight:600">· '+nManto+' N/A excluida'+(nManto>1?"s":"")+" del promedio</span>";
+  }
+
+  return '<div class="mkm-resumen-card" style="background:#fff;border-radius:14px;border:1px solid #e0e0e0;padding:16px 20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">'
+    +'<div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">RESUMEN CONSOLIDADO</div>'
+    +'<div style="font-size:12px;color:#666;margin-top:2px">'+subtitulo+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:'+col.fg+';line-height:1">'+effGlobal+'%</div>'
+    +'<div style="font-size:9px;color:'+col.fg+';letter-spacing:0.5px;margin-top:2px">EFIC GLOBAL</div></div>'
+    +'</div>'
+    +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;font-weight:600">Distribución total ('+totalHrs.toFixed(1)+'h)</p>'
+    +bar+legend
     +'</div>';
 }
 
@@ -1217,52 +1377,105 @@ function buildMaquinaModal(){
       : 'EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas';
 
     // Header con eficiencia grande
-    var header='<div style="text-align:center;padding:14px 0;margin-bottom:14px;border-radius:10px;background:'+col.bg+'">'
-      +'<div style="font-size:44px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+effTxtModal+'</div>'
-      +'<div style="font-size:11px;color:'+col.fg+';margin-top:5px;letter-spacing:0.5px">'+effLblModal+'</div>'
+    var header='<div style="text-align:center;padding:18px 0;margin-bottom:16px;border-radius:12px;background:'+col.bg+'">'
+      +'<div style="font-size:52px;font-weight:700;color:'+col.fg+';line-height:1;letter-spacing:-2px">'+effTxtModal+'</div>'
+      +'<div style="font-size:11px;color:'+col.fg+';margin-top:6px;letter-spacing:0.5px;font-weight:600">'+effLblModal+'</div>'
       +'</div>';
 
-    // Gráfica de tendencia SVG
+    var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
+
+    // ==================================================================
+    // GRÁFICA DE TENDENCIA (más grande, más protagonista visual)
+    // ==================================================================
     var tend=d.tendencia||[];
     var chart="";
     if(tend.length>0){
-      chart='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Tendencia diaria de eficiencia</p>';
-      chart+=_svgLineChart(tend,"eff","dia",240,120);
+      chart='<div style="background:#fafaf9;border-radius:12px;padding:16px 14px 12px;margin-bottom:16px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">'
+        +'<span style="font-size:13px;color:#333;font-weight:700">📈 Tendencia diaria de eficiencia</span>'
+        +'<span style="font-size:11px;color:#888">'+tend.length+' día'+(tend.length>1?'s':'')+'</span>'
+        +'</div>'
+        +_svgLineChart(tend,"eff","dia",480,220)
+        +'</div>';
     }
 
-    // Distribución total (incluye manto)
+    // ==================================================================
+    // DISTRIBUCIÓN DE HORAS — más protagonista visual (barra grande + turnos)
+    // ==================================================================
     var totHrs=res.totalHrs||0.001;
     var pP=(res.hProd/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pM=((res.hManto||0)/totHrs*100),pI=(res.hIdle/totHrs*100);
-    var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
-    var distr='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Distribución de '+totHrs.toFixed(1)+'h totales</p>'
-      +'<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f5f5f3;margin-bottom:10px">'
-      +(pP>0?'<div style="width:'+pP+'%;background:'+COL_PROD+'"></div>':'')
-      +(pS>0?'<div style="width:'+pS+'%;background:'+COL_SET+'"></div>':'')
-      +(pO>0?'<div style="width:'+pO+'%;background:'+COL_OVER+'"></div>':'')
-      +(pM>0?'<div style="width:'+pM+'%;background:'+COL_MANTO+'"></div>':'')
-      +(pI>0?'<div style="width:'+pI+'%;background:'+COL_IDLE+'"></div>':'')
-      +'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
-      +_distrRow(COL_PROD,"Producción",res.hProd,pP)
-      +_distrRow(COL_SET,"Montaje",res.hSet,pS)
-      +_distrRow(COL_OVER,"Sobre-setup",res.hOver,pO)
-      +_distrRow(COL_MANTO,"Manto",res.hManto||0,pM)
-      +_distrRow(COL_IDLE,"Ocioso",res.hIdle,pI)
-      +'</div>';
+
+    // Helper: bloque distribución con barra grande
+    var buildDistr=function(titulo,badge,sub,hrs,vals,pcts,esTotal){
+      var padExt=esTotal?"14px 14px 12px":"10px 12px 10px";
+      var barH=esTotal?"18px":"12px";
+      var titSize=esTotal?"13px":"12px";
+      var htmlBar='<div style="display:flex;height:'+barH+';border-radius:'+(esTotal?"9px":"6px")+';overflow:hidden;background:#f0f0ee;margin-bottom:10px">'
+        +(vals.hProd>0?'<div style="width:'+pcts.pP+'%;background:'+COL_PROD+'"></div>':'')
+        +(vals.hSet>0?'<div style="width:'+pcts.pS+'%;background:'+COL_SET+'"></div>':'')
+        +(vals.hOver>0?'<div style="width:'+pcts.pO+'%;background:'+COL_OVER+'"></div>':'')
+        +(vals.hManto>0?'<div style="width:'+pcts.pM+'%;background:'+COL_MANTO+'"></div>':'')
+        +(vals.hIdle>0?'<div style="width:'+pcts.pI+'%;background:'+COL_IDLE+'"></div>':'')
+        +'</div>';
+      var badgeHtml=badge?'<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:'+badge.bg+';color:'+badge.fg+';font-weight:600;margin-left:6px">'+badge.txt+'</span>':'';
+      return '<div style="background:'+(esTotal?"#fafaf9":"#fff")+';border-radius:12px;padding:'+padExt+';margin-bottom:'+(esTotal?"14px":"10px")+';border:1px solid '+(esTotal?"#e8e8e6":"#eee")+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+        +'<span style="font-size:'+titSize+';color:#333;font-weight:700">'+titulo+badgeHtml+'</span>'
+        +'<span style="font-size:11px;color:#888">'+sub+'</span>'
+        +'</div>'
+        +htmlBar
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:12px">'
+        +_distrRow(COL_PROD,"Producción",vals.hProd,pcts.pP)
+        +_distrRow(COL_SET,"Montaje",vals.hSet,pcts.pS)
+        +_distrRow(COL_OVER,"Sobre-setup",vals.hOver,pcts.pO)
+        +_distrRow(COL_MANTO,"Manto",vals.hManto||0,pcts.pM)
+        +_distrRow(COL_IDLE,"Ocioso",vals.hIdle,pcts.pI)
+        +'</div>'
+        +'</div>';
+    };
+
+    var distr='<p style="font-size:13px;color:#333;font-weight:700;margin:0 0 10px">⚙️ Distribución de horas</p>'
+      +buildDistr("Total del periodo",null,hrs+'h totales',
+        hrs+'h totales',
+        {hProd:res.hProd,hSet:res.hSet,hOver:res.hOver,hManto:res.hManto,hIdle:res.hIdle},
+        {pP:pP,pS:pS,pO:pO,pM:pM,pI:pI},true);
+
+    // v11.8: Desglose por turno (si hay data)
+    var porTurno=res.porTurno||{};
+    ["1ro","3ro"].forEach(function(t){
+      if(porTurno[t]){
+        var pt=porTurno[t];
+        var pth=pt.totalHrs||0.001;
+        var ptPcts={
+          pP:(pt.hProd/pth*100),pS:(pt.hSet/pth*100),
+          pO:(pt.hOver/pth*100),pM:((pt.hManto||0)/pth*100),
+          pI:(pt.hIdle/pth*100)
+        };
+        var effTxt=pt.eff===null?'N/A':pt.eff+'%';
+        var badgeCol=pt.eff===null?{bg:"#FBECEC",fg:"#7A2E2E"}:_effColor(pt.eff);
+        distr+=buildDistr(
+          "Turno "+t,
+          {bg:badgeCol.bg,fg:badgeCol.fg,txt:effTxt},
+          pt.turnos+" día"+(pt.turnos>1?"s":"")+" · "+(pt.piezas||0).toLocaleString("es-MX")+" pzs",
+          pt.totalHrs.toFixed(1)+'h',
+          {hProd:pt.hProd,hSet:pt.hSet,hOver:pt.hOver,hManto:pt.hManto,hIdle:pt.hIdle},
+          ptPcts,false);
+      }
+    });
 
     // Actividad completa (incluye reportes sin estándar)
     var acts=res.acts||[];
-    var actsBlock='<p style="font-size:12px;color:#666;font-weight:600;margin:16px 0 6px">Actividad completa ('+acts.length+' entradas)</p>';
+    var actsBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">👥 Actividad completa ('+acts.length+' entrada'+(acts.length!==1?'s':'')+')</p>';
     if(acts.length===0){
       actsBlock+='<p style="font-size:12px;color:#aaa;padding:8px 0">Sin producción registrada</p>';
     }else{
-      actsBlock+='<div style="max-height:200px;overflow-y:auto">'
+      actsBlock+='<div style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
         +acts.map(function(a){
           var horasCell=a.sinStd
             ? '<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>'
             : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
           var pzasCell=a.sinStd?'<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>':'';
-          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f3;font-size:12px">'
+          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f3;font-size:12px">'
             +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+(a.respName||a.resp)+'</div>'
             +'<div style="color:#888;font-size:11px">'+a.np+' · op '+a.op+'</div>'
             +pzasCell+'</div>'
@@ -1272,14 +1485,14 @@ function buildMaquinaModal(){
 
     body=header+chart+distr+actsBlock;
     if(res.sinStd>0){
-      body+='<div style="font-size:11px;padding:6px 8px;border-radius:5px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar en catálogo (visibles en la lista arriba)</div>';
+      body+='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar en catálogo (visibles en la lista arriba)</div>';
     }
   }
 
   return '<div id="mkmMaqModalBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
-    +'<div style="background:#fff;border-radius:14px;max-width:500px;width:100%;margin-top:20px;padding:18px 20px;max-height:90vh;overflow-y:auto">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-    +'<div><div style="font-size:17px;font-weight:600">'+_esc(mm.maquina)+'</div>'
+    +'<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;margin-top:20px;padding:20px 22px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eee">'
+    +'<div><div style="font-size:19px;font-weight:700">'+_esc(mm.maquina)+'</div>'
     +'<div style="font-size:12px;color:#888">'+_esc(mm.data&&mm.data.area||"")+'</div></div>'
     +'<button id="btnCerrarMaqModal" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
     +'</div>'
@@ -1647,6 +1860,9 @@ function bindResumen(){
   if(bAyuCer2)bAyuCer2.addEventListener("click",cerrarAyudaDash);
   var bgAyu=document.getElementById("mkmAyudaBg");
   if(bgAyu)bgAyu.addEventListener("click",function(e){if(e.target.id==="mkmAyudaBg")cerrarAyudaDash();});
+  // --- Botón Exportar PDF (v11.8) ---
+  var bPdf=document.getElementById("btnExportarPDF");
+  if(bPdf)bPdf.addEventListener("click",exportarDashboardPDF);
 }
 
 // ============================================================
