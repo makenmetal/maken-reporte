@@ -241,6 +241,9 @@ var S = {
     busquedaPartes:"",
     resultadosBusqueda:[],
     buscando:false,
+    // v11.16: Info del estándar y promedio de la parte+op seleccionada
+    infoOperacion:null,  // { catalogo, promedio, numMediciones, eficiencia }
+    infoOperacionCargando:false,
     // Feedback de guardado
     guardando:false,
     exito:false
@@ -1891,7 +1894,7 @@ function buildPiezaModal(){
       nota='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ Esta parte + operación no tiene TiempoCiclo en el catálogo. Considera agregar el estándar en la pestaña Partes del sheet.</div>';
     }
 
-    // v11.14: Mediciones de tiempo de ciclo (solo si hay ≥1)
+    // v11.14/v11.15: Mediciones de tiempo de ciclo (solo si hay ≥1)
     var medBlock="";
     if(d.mediciones&&d.mediciones.numMediciones>0){
       var med=d.mediciones;
@@ -1903,25 +1906,68 @@ function buildPiezaModal(){
         else if(vsCat>=5){vsCatColor="#A32D2D";vsCatTxt="+"+vsCat.toFixed(1)+"% (más lento)";}
         else{vsCatColor="#0C447C";vsCatTxt=(vsCat>=0?"+":"")+vsCat.toFixed(1)+"% (consistente)";}
       }
+
+      // Helper para tarjetas KPI
+      var kpiCard=function(lbl,val,color){
+        return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
+          +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">'+lbl+'</div>'
+          +'<div style="font-size:15px;font-weight:700;color:'+(color||"#222")+';line-height:1.2;margin-top:2px">'+val+'</div></div>';
+      };
+
+      // v11.16: Eficiencia con interpretación de color
+      var efi=med.eficiencia;
+      var efiColor="#555",efiTxt="—";
+      if(efi!==null){
+        efiTxt=efi.toFixed(1)+"%";
+        if(efi>=110)efiColor="#0F6E56";       // verde: arriba del estándar
+        else if(efi>=90)efiColor="#0C447C";   // azul: en estándar
+        else efiColor="#A32D2D";              // rojo: bajo estándar
+      }
+
+      // Fila 1: comparativas
+      var fila1='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">'
+        +kpiCard("CATÁLOGO",(med.catalogo!==null?med.catalogo.toFixed(2)+' min':'—'),"#185FA5")
+        +kpiCard("PROMEDIO",med.promedio.toFixed(2)+' min',"#1D9E75")
+        +kpiCard("MEDIANA",(med.mediana!==null?med.mediana.toFixed(2)+' min':'—'),"#1D9E75")
+        +kpiCard("EFICIENCIA",'<span style="color:'+efiColor+'">'+efiTxt+'</span>',efiColor)
+        +'</div>';
+
+      // Fila 2: dispersión y estabilidad
+      var estColor="#555";
+      var estTxt=med.estabilidad||"—";
+      if(med.estabilidad){
+        if(med.estabilidad==="Muy estable")estColor="#0F6E56";
+        else if(med.estabilidad==="Estable")estColor="#1D9E75";
+        else if(med.estabilidad==="Variable")estColor="#BA7517";
+        else if(med.estabilidad==="Inestable")estColor="#A32D2D";
+      }
+      var cvTxt=med.coeficienteVariacion!==null?med.coeficienteVariacion.toFixed(1)+'%':'—';
+      var desvTxt=med.desviacionEstandar!==null?'± '+med.desviacionEstandar.toFixed(2):'—';
+      var fila2='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">'
+        +kpiCard("RANGO",med.minimo.toFixed(2)+' – '+med.maximo.toFixed(2),"#555")
+        +kpiCard("DESV. EST.",desvTxt,"#555")
+        +kpiCard("CV %",cvTxt,estColor)
+        +kpiCard("ESTABILIDAD",'<span style="color:'+estColor+';font-size:12px">'+estTxt+'</span>',estColor)
+        +'</div>';
+
+      // Nota de confianza según cantidad de mediciones
+      var notaConfianza="";
+      if(med.numMediciones===1){
+        notaConfianza='<div style="background:#FAEEDA;color:#854F0B;font-size:11px;padding:6px 10px;border-radius:6px;margin-bottom:10px">💡 Solo 1 medición. Captura al menos 3-5 para calcular dispersión y estabilidad.</div>';
+      }else if(med.numMediciones===2){
+        notaConfianza='<div style="background:#FAEEDA;color:#854F0B;font-size:11px;padding:6px 10px;border-radius:6px;margin-bottom:10px">💡 2 mediciones. Captura al menos 3 para calcular desviación estándar y CV.</div>';
+      }else if(med.numMediciones<5){
+        notaConfianza='<div style="background:#E6F1FB;color:#0C447C;font-size:11px;padding:6px 10px;border-radius:6px;margin-bottom:10px">💡 '+med.numMediciones+' mediciones. Datos preliminares — captura más para mayor confianza estadística.</div>';
+      }
+
       medBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px;border-left:3px solid #185FA5">'
         +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">'
         +'<p style="font-size:13px;color:#333;font-weight:700;margin:0">🔬 Tiempos de ciclo medidos</p>'
-        +'<span style="font-size:11px;color:#888">'+med.numMediciones+' medición'+(med.numMediciones>1?'es':'')+'</span>'
+        +'<span style="font-size:11px;color:#888">'+med.numMediciones+' medición'+(med.numMediciones>1?'es':'')+' · últimos '+(med.ventanaMeses||6)+' meses</span>'
         +'</div>'
-        +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'
-        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
-        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">CATÁLOGO</div>'
-        +'<div style="font-size:16px;font-weight:700;color:#185FA5">'+(med.catalogo!==null?med.catalogo.toFixed(2):'—')+' min</div></div>'
-        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
-        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">PROMEDIO</div>'
-        +'<div style="font-size:16px;font-weight:700;color:#1D9E75">'+med.promedio.toFixed(2)+' min</div></div>'
-        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
-        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">RANGO</div>'
-        +'<div style="font-size:12px;font-weight:700;color:#555">'+med.minimo.toFixed(2)+' – '+med.maximo.toFixed(2)+'</div></div>'
-        +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center">'
-        +'<div style="font-size:9px;color:#888;font-weight:600;letter-spacing:0.5px">VS CATÁLOGO</div>'
-        +'<div style="font-size:12px;font-weight:700;color:'+vsCatColor+'">'+vsCatTxt+'</div></div>'
-        +'</div>'
+        +fila1
+        +fila2
+        +notaConfianza
         +'<div style="max-height:220px;overflow-y:auto;background:#fff;border-radius:6px;border:1px solid #eee">'
         +'<div style="display:grid;grid-template-columns:60px 1.4fr 1.2fr 60px 1fr;gap:6px;padding:8px 10px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:2px solid #eee;background:#f5f5f3;position:sticky;top:0">'
         +'<div>FECHA</div><div>INGENIERO</div><div>MÁQUINA</div><div style="text-align:right">TC</div><div>OBS.</div></div>'
@@ -2724,6 +2770,7 @@ function buildTC(){
 
   // --- 3. Selector de operación (según parte) ---
   var opBox="";
+  var infoBox="";
   if(t.noParte){
     var opsForPart=[];
     // Buscar operaciones en el catálogo
@@ -2740,6 +2787,40 @@ function buildTC(){
     opBox='<div class="field"><label>Operación</label>'
       +'<select id="tcOperacion" style="width:100%;padding:12px;font-size:15px;border-radius:8px;border:1px solid #ccc;background:#fff">'+opOpts+'</select>'
       +'</div>';
+
+    // v11.16: Box informativo con TC catálogo + promedio real
+    if(t.operacion){
+      if(t.infoOperacionCargando){
+        infoBox='<div style="background:#f5f5f3;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#888">Cargando información de la operación...</div>';
+      }else if(t.infoOperacion){
+        var info=t.infoOperacion;
+        var tcCat=info.catalogo!==null?info.catalogo.toFixed(2)+' min':'Sin estándar en catálogo';
+        var tcCatColor=info.catalogo!==null?"#185FA5":"#854F0B";
+        var promTxt=info.promedio!==null?info.promedio.toFixed(2)+' min':'—';
+        var numMed=info.numMediciones||0;
+        var promSub=numMed===0?'sin mediciones previas':(numMed+' medición'+(numMed>1?'es':'')+' en 6 meses');
+        var efi=info.eficiencia;
+        var efiTxt="",efiColor="#555";
+        if(efi!==null){
+          efiTxt=efi.toFixed(1)+"%";
+          if(efi>=110)efiColor="#0F6E56";
+          else if(efi>=90)efiColor="#0C447C";
+          else efiColor="#A32D2D";
+        }
+        infoBox='<div style="background:#E6F1FB;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+          +'<div style="font-size:10px;color:#0C447C;font-weight:700;letter-spacing:0.5px;margin-bottom:8px">📊 Información de referencia</div>'
+          +'<div style="display:grid;grid-template-columns:1fr 1fr'+(efi!==null?' 1fr':'')+';gap:10px">'
+          +'<div><div style="font-size:10px;color:#666;font-weight:600">TC CATÁLOGO</div>'
+          +'<div style="font-size:15px;font-weight:700;color:'+tcCatColor+'">'+tcCat+'</div></div>'
+          +'<div><div style="font-size:10px;color:#666;font-weight:600">PROMEDIO REAL</div>'
+          +'<div style="font-size:15px;font-weight:700;color:#1D9E75">'+promTxt+'</div>'
+          +'<div style="font-size:10px;color:#888">'+promSub+'</div></div>'
+          +(efi!==null?'<div><div style="font-size:10px;color:#666;font-weight:600">EFICIENCIA</div>'
+            +'<div style="font-size:15px;font-weight:700;color:'+efiColor+'">'+efiTxt+'</div></div>':'')
+          +'</div>'
+          +'</div>';
+      }
+    }
   }
 
   // --- 4. Tiempo (min + seg) con preview ---
@@ -2785,6 +2866,7 @@ function buildTC(){
     +maquinaBox
     +busqBox
     +opBox
+    +infoBox
     +tiempoBox
     +obsBox
     +enviarBtn
@@ -2832,11 +2914,38 @@ function tcBuscarPartes(q){
 function tcSeleccionarParte(np,opsStr){
   S.tc.noParte=np;
   S.tc.operacion="";
+  S.tc.infoOperacion=null;  // v11.16: limpiar info al cambiar parte
   S.tc.resultadosBusqueda=[];
   S.tc.busquedaPartes="";
   render();
 }
-function tcSetOperacion(v){S.tc.operacion=v;render();}
+function tcSetOperacion(v){
+  S.tc.operacion=v;
+  // v11.16: Al elegir operación, cargar TC catálogo y promedio de mediciones
+  if(v&&S.tc.noParte){
+    tcCargarInfoOperacion();
+  }else{
+    S.tc.infoOperacion=null;
+  }
+  render();
+}
+function tcCargarInfoOperacion(){
+  var t=S.tc;
+  if(!t.noParte||!t.operacion)return;
+  S.tc.infoOperacionCargando=true;
+  render();
+  apiGet({action:"tiemposCicloPorParteOp",noParte:t.noParte,operacion:t.operacion})
+    .then(function(r){
+      S.tc.infoOperacion=r;
+      S.tc.infoOperacionCargando=false;
+      render();
+    })
+    .catch(function(){
+      S.tc.infoOperacion=null;
+      S.tc.infoOperacionCargando=false;
+      render();
+    });
+}
 function tcEnviar(){
   var t=S.tc;
   var mins=parseInt(t.minutos)||0;
@@ -2870,12 +2979,16 @@ function tcEnviar(){
   };
   enviar(payload)
     .then(function(){
-      // Limpiar formulario, dejar máquina para captura consecutiva
+      // v11.16: Reset completo del formulario tras guardar exitoso
+      S.tc.maquina="";
       S.tc.noParte="";
       S.tc.operacion="";
       S.tc.minutos="";
       S.tc.segundos="";
       S.tc.observaciones="";
+      S.tc.infoOperacion=null;
+      S.tc.busquedaPartes="";
+      S.tc.resultadosBusqueda=[];
       S.tc.exito=true;
       S.tc.guardando=false;
       render();
