@@ -257,7 +257,14 @@ var S = {
       maquina:"",
       loading:false,
       data:null
-    }
+    },
+    // v11.10: Modal apilado de detalle por pieza (operador+parte+op)
+    piezaModal:{
+      key:"",           // "maquina|parte|op|resp" — vacío = cerrado
+      loading:false,
+      data:null
+    },
+    piezaModalCache:{}  // cache local, invalida al cambiar filtros
   },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
   // Solicitudes
@@ -414,9 +421,10 @@ function cargarResumen(){
 }
 function cargarDashboard(){
   var d=S.dashboard;
-  // v11.9: Al cambiar filtros/recargar, invalidamos el cache de modales
+  // v11.9/v11.10: Al cambiar filtros/recargar, invalidamos los cachés locales
   // porque los resultados dependen del rango/turno/filtro actual
   d.maqModalCache={};
+  d.piezaModalCache={};
   // v11.9: NO limpiamos d.data — así el overlay puede mostrar la vista previa
   // mientras carga. Solo se limpia si la primera carga aún no ha ocurrido.
   d.loading=true;
@@ -488,6 +496,45 @@ function abrirModalMaquina(maq){
 }
 function cerrarModalMaquina(){
   S.dashboard.maqModal={maquina:"",loading:false,data:null};
+  render();
+}
+// v11.10: Detalle por pieza (modal apilado sobre modal de máquina)
+function abrirModalPieza(maquina,noParte,operacion,responsable){
+  var d=S.dashboard;
+  var key=maquina+"|"+noParte+"|"+operacion+"|"+responsable;
+  var cacheKey=key+"|"+d.periodo+"|"+d.turno+"|"+(d.desde||"")+"|"+(d.hasta||"");
+  var cached=d.piezaModalCache[cacheKey];
+  if(cached){
+    S.dashboard.piezaModal={key:key,loading:false,data:cached};
+    render();
+    return;
+  }
+  S.dashboard.piezaModal={key:key,loading:true,data:null};
+  render();
+  var params={
+    action:"detallePiezaOperador",
+    maquina:maquina,
+    noParte:noParte,
+    operacion:operacion,
+    responsable:responsable,
+    periodo:d.periodo,
+    turno:d.turno
+  };
+  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  apiGet(params)
+    .then(function(r){
+      S.dashboard.piezaModalCache[cacheKey]=r;
+      S.dashboard.piezaModal.data=r;
+      S.dashboard.piezaModal.loading=false;
+      render();
+    })
+    .catch(function(){
+      S.dashboard.piezaModal.loading=false;
+      render();
+    });
+}
+function cerrarModalPieza(){
+  S.dashboard.piezaModal={key:"",loading:false,data:null};
   render();
 }
 // --- Modal de ayuda / manual ---
@@ -1190,6 +1237,11 @@ function buildDashboard(){
   if(d.maqModal&&d.maqModal.maquina){
     modal=buildMaquinaModal();
   }
+  // v11.10: Modal apilado de detalle por pieza (encima del de máquina)
+  var piezaModalHtml="";
+  if(d.piezaModal&&d.piezaModal.key){
+    piezaModalHtml=buildPiezaModal();
+  }
   // --- Modal del selector de máquinas ---
   var selectorModal="";
   if(d.selectorMaqOpen){
@@ -1201,7 +1253,7 @@ function buildDashboard(){
     ayudaModal=buildAyudaDashModal();
   }
 
-  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+selectorModal+ayudaModal;
+  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1355,30 +1407,6 @@ function dashMaqCard(c){
     +legendRow(COL_IDLE,"Ocioso",c.hIdle,pI)
     +'</div>';
 
-  var acts=(c.acts||[]).slice(0,5);
-  var actsHtml='';
-  if(acts.length===0){
-    actsHtml='<p style="font-size:11px;color:#aaa;padding:4px 0">Sin producción registrada</p>';
-  }else{
-    actsHtml=acts.map(function(a){
-      var horasCell=a.sinStd
-        ? '<div style="color:#854F0B;text-align:right;line-height:1.3;font-size:10px">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 5px;border-radius:3px;font-weight:700;font-size:9px">SIN ESTÁNDAR</span></div>'
-        : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums;line-height:1.3">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
-      var pzasCell=a.sinStd
-        ? '<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>'
-        : '';
-      return '<div style="display:grid;grid-template-columns:1fr auto;gap:6px;padding:3px 0;font-size:11px">'
-        +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+(a.respName||a.resp)+'</div>'
-        +'<div style="color:#888;font-size:10px">'+a.np+' · op '+a.op+'</div>'
-        +pzasCell+'</div>'
-        +horasCell
-        +'</div>';
-    }).join("");
-    if(c.acts.length>5){
-      actsHtml+='<p style="font-size:10px;color:#999;text-align:center;padding:4px 0">+ '+(c.acts.length-5)+' más — toca para ver detalle</p>';
-    }
-  }
-
   // Turnos presentes (ej: "1ro · 3ro")
   var turnosStr=(c.turnosPresentes&&c.turnosPresentes.length)?c.turnosPresentes.join(" · "):c.turnos+" turno"+(c.turnos>1?'s':'');
 
@@ -1394,6 +1422,8 @@ function dashMaqCard(c){
   var effLabel = esNA ? 'NO APLICA · MANTO ≥ 90%' : 'EFICIENCIA';
   var effFontSize = esNA ? '30px' : '36px';
 
+  // v11.9: La actividad detallada solo se muestra en el modal de detalle,
+  // no en la tarjeta principal (mejora legibilidad del resumen).
   return '<div class="mkm-mach-card" data-mkm-maq="'+_esc(c.maquina)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
     +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
     +'<div style="font-size:15px;font-weight:600">'+_esc(c.maquina)+'</div>'
@@ -1407,10 +1437,8 @@ function dashMaqCard(c){
     +infoDisp
     +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
     +bar+legend
-    +'<div style="border-top:1px solid #f0f0f0;padding-top:8px">'
-    +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Actividad detallada</p>'
-    +actsHtml
-    +'</div></div>';
+    +'<div style="font-size:10px;color:#999;text-align:center;padding:6px 0 0;border-top:1px solid #f0f0f0;margin-top:4px">Toca para ver detalle</div>'
+    +'</div>';
 }
 
 // Modal de máquina expandida con tendencia diaria
@@ -1521,22 +1549,25 @@ function buildMaquinaModal(){
     });
 
     // Actividad completa (incluye reportes sin estándar)
+    // v11.10: Cada renglón es clickable — abre modal de detalle por pieza
     var acts=res.acts||[];
-    var actsBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">👥 Actividad completa ('+acts.length+' entrada'+(acts.length!==1?'s':'')+')</p>';
+    var actsBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">👥 Actividad completa ('+acts.length+' entrada'+(acts.length!==1?'s':'')+') <span style="font-size:10px;color:#888;font-weight:500">· toca un renglón para ver detalle</span></p>';
     if(acts.length===0){
       actsBlock+='<p style="font-size:12px;color:#aaa;padding:8px 0">Sin producción registrada</p>';
     }else{
-      actsBlock+='<div style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
+      actsBlock+='<div style="max-height:240px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
         +acts.map(function(a){
           var horasCell=a.sinStd
             ? '<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>'
             : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
           var pzasCell=a.sinStd?'<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>':'';
-          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f3;font-size:12px">'
-            +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+(a.respName||a.resp)+'</div>'
-            +'<div style="color:#888;font-size:11px">'+a.np+' · op '+a.op+'</div>'
+          return '<div class="mkm-act-row" data-mkm-pieza-maq="'+_esc(mm.maquina)+'" data-mkm-pieza-np="'+_esc(a.np)+'" data-mkm-pieza-op="'+_esc(a.op)+'" data-mkm-pieza-resp="'+_esc(a.resp)+'" style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;cursor:pointer;align-items:center;border-radius:6px;transition:background 0.15s">'
+            +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+_esc(a.respName||a.resp)+'</div>'
+            +'<div style="color:#888;font-size:11px">'+_esc(a.np)+' · op '+_esc(a.op)+'</div>'
             +pzasCell+'</div>'
-            +horasCell+'</div>';
+            +horasCell
+            +'<span style="color:#bbb;font-size:14px;padding-left:4px">›</span>'
+            +'</div>';
         }).join("")+'</div>';
     }
 
@@ -1555,6 +1586,153 @@ function buildMaquinaModal(){
     +'</div>'
     +body
     +'</div></div>';
+}
+
+// v11.10: Modal apilado con detalle por pieza (operador+parte+op)
+// Se abre encima del modal de máquina cuando el usuario toca un renglón de actividad
+function buildPiezaModal(){
+  var pm=S.dashboard.piezaModal;
+  if(!pm||!pm.key)return"";
+
+  // Parsear key: "maquina|noParte|operacion|responsable"
+  var partes=pm.key.split("|");
+  var maquina=partes[0]||"";
+  var noParte=partes[1]||"";
+  var operacion=partes[2]||"";
+
+  var body="";
+  if(pm.loading){
+    body='<div style="padding:3rem;text-align:center;color:#888">Cargando detalle...</div>';
+  }else if(!pm.data||!pm.data.ok){
+    body='<div style="padding:3rem;text-align:center;color:#E24B4A">Error al cargar detalle</div>';
+  }else{
+    var d=pm.data;
+    var tc=d.tiempoCiclo;
+    var pzsPorHora=d.pzsPorHoraEstandar;
+
+    // KPIs de la entrada
+    var infoRow=function(lbl,val,color){
+      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px 12px;text-align:center">'
+        +'<div style="font-size:10px;color:#888;font-weight:600;letter-spacing:0.5px;margin-bottom:4px">'+lbl+'</div>'
+        +'<div style="font-size:20px;font-weight:700;color:'+(color||"#222")+';line-height:1">'+val+'</div>'
+        +'</div>';
+    };
+    var tcTxt=tc!==null?tc.toFixed(2)+' min':'<span style="color:#854F0B">—</span>';
+    var pphTxt=pzsPorHora!==null?pzsPorHora.toFixed(1):'<span style="color:#854F0B">—</span>';
+    var kpiRow='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'
+      +infoRow("PIEZAS",(d.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
+      +infoRow("HRS ESTÁNDAR",(d.totalHorasEstandar||0).toFixed(2)+"h","#1D9E75")
+      +infoRow("TIEMPO CICLO",tcTxt,"#185FA5")
+      +infoRow("PZS/HORA STD",pphTxt,"#185FA5")
+      +'</div>';
+
+    // Reportes individuales
+    var reportes=d.reportes||[];
+    var reportesBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
+      +'<p style="font-size:12px;color:#333;font-weight:700;margin:0 0 10px">📋 Reportes individuales ('+reportes.length+')</p>';
+    if(reportes.length===0){
+      reportesBlock+='<p style="font-size:12px;color:#aaa;padding:4px 0">Sin reportes en el periodo</p>';
+    }else{
+      reportesBlock+='<div style="max-height:180px;overflow-y:auto;background:#fff;border-radius:6px;border:1px solid #eee">'
+        +'<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;padding:8px 12px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:2px solid #eee;background:#f5f5f3">'
+        +'<div>FECHA</div><div>TURNO</div><div style="text-align:right">PIEZAS</div><div style="text-align:right">HRS EST.</div></div>'
+        +reportes.map(function(r){
+          return '<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;padding:6px 12px;font-size:12px;border-bottom:1px solid #f5f5f3">'
+            +'<div style="color:#333">'+_esc(r.fecha)+'</div>'
+            +'<div style="color:#666">'+_esc(r.turno)+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+(r.piezas||0).toLocaleString("es-MX")+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#666">'+(r.horasEstandar||0).toFixed(2)+'h</div>'
+            +'</div>';
+        }).join("")+'</div>';
+    }
+    reportesBlock+='</div>';
+
+    // Tendencia diaria (piezas por día)
+    var tend=d.tendencia||[];
+    var tendBlock="";
+    if(tend.length>1){
+      tendBlock='<div style="background:#fafaf9;border-radius:10px;padding:14px;margin-bottom:14px">'
+        +'<p style="font-size:12px;color:#333;font-weight:700;margin:0 0 8px">📈 Tendencia diaria de producción</p>'
+        +_svgBarChart(tend,"piezas","dia",480,180,"#1D9E75")
+        +'<div style="margin-top:10px;display:grid;grid-template-columns:60px 1fr 1fr 60px;gap:8px;font-size:10px;color:#888;font-weight:700;letter-spacing:0.5px;padding-bottom:4px;border-bottom:1px solid #ddd">'
+        +'<div>DÍA</div><div style="text-align:right">PIEZAS</div><div style="text-align:right">HRS EST.</div><div style="text-align:right">TURNOS</div></div>'
+        +tend.map(function(t){
+          return '<div style="display:grid;grid-template-columns:60px 1fr 1fr 60px;gap:8px;padding:5px 0;font-size:12px;border-bottom:1px solid #f5f5f3">'
+            +'<div style="color:#333;font-weight:500">'+_esc(t.dia)+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">'+(t.piezas||0).toLocaleString("es-MX")+'</div>'
+            +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#666">'+(t.horas||0).toFixed(2)+'h</div>'
+            +'<div style="text-align:right;color:#666">'+(t.turnos||0)+'</div>'
+            +'</div>';
+        }).join("")+'</div>';
+    }
+
+    // Nota sobre la eficiencia individual
+    var notaEff="";
+    if(tc===null){
+      notaEff='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#FAEEDA;color:#854F0B">⚠ Esta parte + operación no tiene TiempoCiclo en el catálogo. Se muestran los datos crudos pero no se calculan horas estándar. Considera agregar el estándar en la pestaña Partes del sheet.</div>';
+    }else{
+      notaEff='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:8px;background:#F0F4F8;color:#555">💡 Las "horas estándar" son teóricas: piezas × tiempo ciclo. No se registran horas reales por reporte, así que no se calcula eficiencia individual — solo se ve al nivel de máquina.</div>';
+    }
+
+    body=kpiRow+reportesBlock+tendBlock+notaEff;
+  }
+
+  return '<div id="mkmPiezaModalBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1005;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:640px;width:100%;margin-top:20px;padding:20px 22px;max-height:90vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #eee">'
+    +'<div style="flex:1">'
+    +'<div style="font-size:12px;color:#888;margin-bottom:2px">'+_esc(pm.data&&pm.data.responsableNombre||"")+'</div>'
+    +'<div style="font-size:19px;font-weight:700">'+_esc(noParte)+' <span style="color:#888;font-weight:500;font-size:14px">· op '+_esc(operacion)+'</span></div>'
+    +'<div style="font-size:12px;color:#888;margin-top:2px">'+_esc(maquina)+'</div>'
+    +'</div>'
+    +'<button id="btnCerrarPiezaModal" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
+}
+
+// SVG helper: gráfica de barras vertical simple (para producción diaria)
+function _svgBarChart(data,valKey,labelKey,w,h,color){
+  if(!data||data.length===0)return'<p style="color:#aaa;font-size:12px">Sin datos</p>';
+  var pad={top:12,right:8,bottom:24,left:32};
+  var innerW=w-pad.left-pad.right;
+  var innerH=h-pad.top-pad.bottom;
+  var maxV=Math.max.apply(null,data.map(function(d){return d[valKey]||0;}));
+  if(maxV<=0)maxV=1;
+  // Ajustar maxV a múltiplo redondo
+  var step=Math.pow(10,Math.floor(Math.log10(maxV)));
+  maxV=Math.ceil(maxV/step)*step;
+
+  var barW=innerW/data.length*0.7;
+  var gap=innerW/data.length*0.3;
+  var bars=data.map(function(d,i){
+    var v=d[valKey]||0;
+    var bh=(v/maxV)*innerH;
+    var x=pad.left+i*(innerW/data.length)+(gap/2);
+    var y=pad.top+innerH-bh;
+    return '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" fill="'+color+'" rx="2"/>'
+      +'<text x="'+(x+barW/2)+'" y="'+(y-3)+'" font-size="9" fill="#555" text-anchor="middle" font-weight="600">'+(v||"")+'</text>';
+  }).join("");
+
+  // Grid lines
+  var gridLines="";
+  var lines=4;
+  for(var g=0;g<=lines;g++){
+    var vg=(maxV/lines)*g;
+    var y=pad.top+innerH-(vg/maxV)*innerH;
+    gridLines+='<line x1="'+pad.left+'" y1="'+y+'" x2="'+(w-pad.right)+'" y2="'+y+'" stroke="#eee" stroke-width="1"/>';
+    gridLines+='<text x="'+(pad.left-4)+'" y="'+(y+3)+'" font-size="9" fill="#888" text-anchor="end">'+Math.round(vg)+'</text>';
+  }
+
+  var labels=data.map(function(d,i){
+    if(data.length>10&&i%Math.ceil(data.length/10)!==0)return"";
+    var x=pad.left+i*(innerW/data.length)+(innerW/data.length)/2;
+    return '<text x="'+x+'" y="'+(h-8)+'" font-size="9" fill="#888" text-anchor="middle">'+d[labelKey]+'</text>';
+  }).join("");
+
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="max-width:'+w+'px;display:block;margin:0 auto">'
+    +gridLines+bars+labels
+    +'</svg>';
 }
 
 // SVG helper: gráfica de línea simple
@@ -1920,6 +2098,23 @@ function bindResumen(){
   // --- Botón Exportar PDF (v11.8) ---
   var bPdf=document.getElementById("btnExportarPDF");
   if(bPdf)bPdf.addEventListener("click",exportarDashboardPDF);
+  // --- Modal detalle por pieza (v11.10) ---
+  document.querySelectorAll(".mkm-act-row").forEach(function(el){
+    el.addEventListener("click",function(){
+      abrirModalPieza(
+        el.dataset.mkmPiezaMaq,
+        el.dataset.mkmPiezaNp,
+        el.dataset.mkmPiezaOp,
+        el.dataset.mkmPiezaResp
+      );
+    });
+    el.addEventListener("mouseover",function(){el.style.background="#f5f5f3";});
+    el.addEventListener("mouseout",function(){el.style.background="";});
+  });
+  var bCerP=document.getElementById("btnCerrarPiezaModal");
+  if(bCerP)bCerP.addEventListener("click",cerrarModalPieza);
+  var bgP=document.getElementById("mkmPiezaModalBg");
+  if(bgP)bgP.addEventListener("click",function(e){if(e.target.id==="mkmPiezaModalBg")cerrarModalPieza();});
 }
 
 // ============================================================
