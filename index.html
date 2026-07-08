@@ -1174,11 +1174,32 @@ function directaSubtipo(t){S.sol.directa.subtipo=t;render();}
 
 function render(){
   var app=document.getElementById("app");
+  // v11.14: Capturar el elemento con foco ANTES de destruir el DOM,
+  // para restaurarlo después. Esto evita que el usuario pierda la celda
+  // en la que está escribiendo cuando cada tecla dispara un re-render.
+  var _active=document.activeElement;
+  var _activeId=_active&&_active.id?_active.id:null;
+  var _selStart=null,_selEnd=null;
+  if(_activeId&&(_active.tagName==="INPUT"||_active.tagName==="TEXTAREA")){
+    try{_selStart=_active.selectionStart;_selEnd=_active.selectionEnd;}catch(e){}
+  }
   if(S.view==="loading"){app.innerHTML='<div class="spinner">Cargando catalogos...</div>';return;}
   if(S.view==="login"){app.innerHTML=buildLogin();bindLogin();return;}
   if(S.view==="done"){app.innerHTML=buildDone();bindDone();return;}
-  if(S.view==="resumen"){app.innerHTML=buildResumen();bindResumen();return;}
-  app.innerHTML=buildMain();bindMain();
+  if(S.view==="resumen"){app.innerHTML=buildResumen();bindResumen();}
+  else{app.innerHTML=buildMain();bindMain();}
+  // Restaurar foco al mismo elemento (si aún existe con el mismo id)
+  if(_activeId){
+    var _newEl=document.getElementById(_activeId);
+    if(_newEl&&(_newEl.tagName==="INPUT"||_newEl.tagName==="TEXTAREA"||_newEl.tagName==="SELECT")){
+      try{
+        _newEl.focus();
+        if(_selStart!==null&&_newEl.setSelectionRange){
+          _newEl.setSelectionRange(_selStart,_selEnd);
+        }
+      }catch(e){}
+    }
+  }
 }
 
 function buildLogin(){
@@ -2835,7 +2856,7 @@ function tcEnviar(){
     tiempoCicloReal:Math.round(totalMin*100)/100,
     observaciones:t.observaciones||""
   };
-  apiPost(payload)
+  enviar(payload)
     .then(function(){
       // Limpiar formulario, dejar máquina para captura consecutiva
       S.tc.noParte="";
@@ -2851,7 +2872,7 @@ function tcEnviar(){
     })
     .catch(function(err){
       S.tc.guardando=false;
-      alert("Error al guardar: "+(err.message||"desconocido"));
+      alert("Error al guardar: "+((err&&err.message)||"desconocido"));
       render();
     });
 }
