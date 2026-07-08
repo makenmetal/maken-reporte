@@ -2749,9 +2749,9 @@ function buildTC(){
   var previewTxt=(mins||segs)?'<div style="margin-top:8px;padding:8px 12px;background:#E6F1FB;border-radius:8px;font-size:14px;color:#0C447C;font-weight:600">= '+totalMin.toFixed(2)+' minutos</div>':'';
   var tiempoBox='<div class="field"><label>Tiempo de ciclo real</label>'
     +'<div style="display:flex;gap:8px;align-items:center">'
-    +'<input type="number" id="tcMinutos" placeholder="0" value="'+_esc(t.minutos)+'" min="0" max="999" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center" inputmode="numeric">'
+    +'<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="tcMinutos" placeholder="0" value="'+_esc(t.minutos)+'" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center">'
     +'<span style="font-size:14px;color:#666;font-weight:600">min</span>'
-    +'<input type="number" id="tcSegundos" placeholder="0" value="'+_esc(t.segundos)+'" min="0" max="59" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center" inputmode="numeric">'
+    +'<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="tcSegundos" placeholder="0" value="'+_esc(t.segundos)+'" style="flex:1;padding:12px;font-size:16px;border-radius:8px;border:1px solid #ccc;text-align:center">'
     +'<span style="font-size:14px;color:#666;font-weight:600">seg</span>'
     +'</div>'
     +previewTxt
@@ -2793,8 +2793,20 @@ function buildTC(){
 
 // Handlers TC
 function tcSetMaquina(v){S.tc.maquina=v;render();}
-function tcSetMinutos(v){S.tc.minutos=v;render();}
-function tcSetSegundos(v){S.tc.segundos=v;render();}
+function tcSetMinutos(v){
+  // Solo dígitos, máx 3 caracteres
+  var clean=String(v||"").replace(/[^0-9]/g,"").slice(0,3);
+  S.tc.minutos=clean;
+  render();
+}
+function tcSetSegundos(v){
+  // Solo dígitos, máx 2 caracteres, tope 59
+  var clean=String(v||"").replace(/[^0-9]/g,"").slice(0,2);
+  var n=parseInt(clean);
+  if(!isNaN(n)&&n>59)clean="59";
+  S.tc.segundos=clean;
+  render();
+}
 function tcSetObs(v){S.tc.observaciones=v;}
 function tcBuscarPartes(q){
   S.tc.busquedaPartes=q;
