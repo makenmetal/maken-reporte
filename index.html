@@ -1492,8 +1492,8 @@ function buildMaquinaModal(){
     };
 
     var distr='<p style="font-size:13px;color:#333;font-weight:700;margin:0 0 10px">⚙️ Distribución de horas</p>'
-      +buildDistr("Total del periodo",null,hrs+'h totales',
-        hrs+'h totales',
+      +buildDistr("Total del periodo",null,totHrs.toFixed(1)+'h totales',
+        totHrs.toFixed(1)+'h',
         {hProd:res.hProd,hSet:res.hSet,hOver:res.hOver,hManto:res.hManto,hIdle:res.hIdle},
         {pP:pP,pS:pS,pO:pO,pM:pM,pI:pI},true);
 
