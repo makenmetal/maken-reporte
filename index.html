@@ -229,7 +229,7 @@ var S = {
   prod:{maquina:"",partidas:[mkPartida()]},
   setup:{maquina:"",noParte:"",operacion:"",horas:"",ot:"",q:""},
   manto:{maquina:"",tipo:"",subtipo:"",descripcion:"",horas:""},
-  // Dashboard de eficiencia por máquina (v11.7)
+  // Dashboard de eficiencia por máquina (v11.9)
   dashboard:{
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
     area:"all",          // "all" | nombre de área
@@ -248,6 +248,10 @@ var S = {
     ayudaOpen:false,
     loading:false,
     data:null,
+    // v11.9: Cache local del modal por máquina — evita re-consultar backend
+    // cuando el usuario abre/cierra la misma máquina con los mismos filtros.
+    // Se invalida en cualquier cambio de filtro.
+    maqModalCache:{},   // { "maquina|filtros_hash": data }
     // Modal de máquina expandida
     maqModal:{
       maquina:"",
@@ -410,7 +414,13 @@ function cargarResumen(){
 }
 function cargarDashboard(){
   var d=S.dashboard;
-  d.loading=true;d.data=null;render();
+  // v11.9: Al cambiar filtros/recargar, invalidamos el cache de modales
+  // porque los resultados dependen del rango/turno/filtro actual
+  d.maqModalCache={};
+  // v11.9: NO limpiamos d.data — así el overlay puede mostrar la vista previa
+  // mientras carga. Solo se limpia si la primera carga aún no ha ocurrido.
+  d.loading=true;
+  render();
   var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area,turno:d.turno};
   if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
   // Si hay máquinas específicas seleccionadas, incluirlas en la petición
@@ -452,13 +462,28 @@ function aplicarRangoCustom(){
   cargarDashboard();
 }
 function abrirModalMaquina(maq){
+  var d=S.dashboard;
+  // v11.9: Cache local del modal. Si ya cargamos esta máquina con los mismos
+  // filtros actuales, reutilizamos la data (sin llamada al backend).
+  var cacheKey=maq+"|"+d.periodo+"|"+d.turno+"|"+(d.desde||"")+"|"+(d.hasta||"");
+  var cached=d.maqModalCache[cacheKey];
+  if(cached){
+    S.dashboard.maqModal={maquina:maq,loading:false,data:cached};
+    render();
+    return;
+  }
   S.dashboard.maqModal={maquina:maq,loading:true,data:null};
   render();
-  var d=S.dashboard;
   var params={action:"dashboardEfMaquina",maquina:maq,periodo:d.periodo,area:"all",turno:d.turno};
   if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
   apiGet(params)
-    .then(function(r){S.dashboard.maqModal.data=r;S.dashboard.maqModal.loading=false;render();})
+    .then(function(r){
+      // Guardar en cache local para próxima apertura
+      S.dashboard.maqModalCache[cacheKey]=r;
+      S.dashboard.maqModal.data=r;
+      S.dashboard.maqModal.loading=false;
+      render();
+    })
     .catch(function(){S.dashboard.maqModal.loading=false;render();});
 }
 function cerrarModalMaquina(){
@@ -1083,6 +1108,38 @@ function buildDashboard(){
   var controles=selPeriodo+rangoHtml+filtroRow1+filtroRow2+ordenRow;
 
   if(d.loading){
+    // v11.9: Si ya hay datos previos, mostrarlos con un overlay de loading
+    // en lugar de destruir todo el UI. Esto reduce el "flash" visual y siente más rápido.
+    if(d.data&&d.data.ok){
+      // Preservar la última vista con overlay
+      var cardsPrev=(d.data.cards||[]).slice();
+      var _sortEffDescP=function(a,b){
+        if(a.eff===null&&b.eff===null)return 0;
+        if(a.eff===null)return 1;
+        if(b.eff===null)return -1;
+        return b.eff-a.eff;
+      };
+      var _sortEffAscP=function(a,b){
+        if(a.eff===null&&b.eff===null)return 0;
+        if(a.eff===null)return 1;
+        if(b.eff===null)return -1;
+        return a.eff-b.eff;
+      };
+      if(d.orden==="eff-desc")cardsPrev.sort(_sortEffDescP);
+      else if(d.orden==="eff-asc")cardsPrev.sort(_sortEffAscP);
+      else cardsPrev.sort(function(a,b){return (b.piezas||0)-(a.piezas||0);});
+      var resumenPrev=dashResumenCard(d.data,cardsPrev);
+      var gridPrev=cardsPrev.length===0?"":'<div class="mkm-dash-grid">'+cardsPrev.map(dashMaqCard).join("")+'</div>';
+      var kpisPrev='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">'
+        +dashKpi("EFIC GLOBAL",(d.data.effGlobal||0)+"%","#1D9E75")
+        +dashKpi("PIEZAS",(d.data.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
+        +dashKpi("MÁQUINAS",d.data.numMaquinas||0,"#555")
+        +dashKpi("HRS DISP",(d.data.totalHrsDisp||0).toFixed(0)+"h","#555")
+        +'</div>';
+      var overlay='<div style="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:100;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);border-radius:20px;padding:8px 16px;font-size:12px;color:#555;display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border:2px solid #ccc;border-top-color:#1D9E75;border-radius:50%;display:inline-block;animation:mkmSpin 0.8s linear infinite"></span>Actualizando...</div><style>@keyframes mkmSpin{to{transform:rotate(360deg)}}</style>';
+      var contentPrev='<div style="opacity:0.55;pointer-events:none">'+kpisPrev+resumenPrev+gridPrev+'</div>'+overlay;
+      return wrapDashboard(controles+contentPrev,periodoLabel);
+    }
     return wrapDashboard(controles+'<div style="text-align:center;padding:3rem;color:#888">Cargando dashboard...</div>',periodoLabel);
   }
 
