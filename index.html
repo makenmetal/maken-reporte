@@ -1647,6 +1647,57 @@ function buildMaquinaModal(){
       +'<div style="font-size:11px;color:'+col.fg+';margin-top:6px;letter-spacing:0.5px;font-weight:600">'+effLblModal+'</div>'
       +'</div>';
 
+    // v11.17: Bloque de Eficiencia Recalibrada (basada en TC reales medidos)
+    var efMax="";
+    if(res.effRecalibrada!==null&&res.effRecalibrada!==undefined&&!esNAModal){
+      var effRec=res.effRecalibrada;
+      var effAct=res.eff||0;
+      var pConM=res.partesConMedicion||0;
+      var pSinM=res.partesSinMedicion||0;
+      var totalP=pConM+pSinM;
+      var diff=effRec-effAct;
+      // Interpretación: si eficiencia recalibrada es MENOR, significa que el catálogo
+      // sobrestima el tiempo (TC medidos son más rápidos → produces piezas equivalentes
+      // a menos horas → eficiencia real es menor)
+      var flechaTxt="",flechaColor="#0C447C",interpretacion="";
+      if(diff<-2){
+        flechaTxt="↓ "+diff+" pts";
+        flechaColor="#A32D2D";
+        interpretacion="El estándar del catálogo <b>sobrestima</b> el tiempo real. La eficiencia mostrada arriba es engañosamente alta.";
+      }else if(diff>2){
+        flechaTxt="↑ +"+diff+" pts";
+        flechaColor="#0F6E56";
+        interpretacion="El estándar del catálogo <b>subestima</b> el tiempo real. La máquina va más eficiente de lo que el catálogo indica.";
+      }else{
+        flechaTxt="≈ "+(diff>=0?"+":"")+diff+" pts";
+        flechaColor="#0C447C";
+        interpretacion="El catálogo está <b>bien calibrado</b> respecto a los TC medidos.";
+      }
+      // Cobertura de mediciones
+      var cobTxt="";
+      if(totalP===0){
+        cobTxt="Sin mediciones aplicables";
+      }else{
+        var pctCob=Math.round((pConM/totalP)*100);
+        if(pctCob>=80)cobTxt='<span style="color:#0F6E56;font-weight:600">Alta cobertura</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%)';
+        else if(pctCob>=50)cobTxt='<span style="color:#BA7517;font-weight:600">Cobertura media</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%)';
+        else cobTxt='<span style="color:#A32D2D;font-weight:600">Cobertura baja</span> · '+pConM+' de '+totalP+' partes+op con TC medido ('+pctCob+'%) — captura más para mejorar precisión';
+      }
+
+      efMax='<div style="background:#fafaf9;border-radius:12px;border:1px solid #E6F1FB;border-left:4px solid #185FA5;padding:14px 16px;margin-bottom:16px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">'
+        +'<div><div style="font-size:11px;color:#888;font-weight:700;letter-spacing:0.5px">EFICIENCIA RECALIBRADA</div>'
+        +'<div style="font-size:10px;color:#888;margin-top:2px">Con TC medidos por ingeniería (últimos 6 meses)</div></div>'
+        +'<div style="text-align:right"><div style="font-size:32px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
+        +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+' vs catálogo</div></div>'
+        +'</div>'
+        +'<div style="font-size:11px;color:#555;line-height:1.5;padding-top:8px;border-top:1px solid #eee">'
+        +'💡 '+interpretacion+'<br>'
+        +'<span style="color:#888;font-size:10px">📊 '+cobTxt+'</span>'
+        +'</div>'
+        +'</div>';
+    }
+
     var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
 
     // ==================================================================
@@ -1751,7 +1802,7 @@ function buildMaquinaModal(){
         }).join("")+'</div>';
     }
 
-    body=header+chart+distr+actsBlock;
+    body=header+efMax+chart+distr+actsBlock;
     if(res.sinStd>0){
       body+='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar en catálogo (visibles en la lista arriba)</div>';
     }
