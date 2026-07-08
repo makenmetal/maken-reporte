@@ -378,6 +378,19 @@ function cargarCatalogoMaquinas(){
     return S.dashboard.catalogoMaquinas;
   });
 }
+// Helper: preserva la posición del scroll de la lista antes/después de render()
+function _renderPreservandoScroll(){
+  var lista=document.getElementById("mkmSelMaqLista");
+  var scrollY=lista?lista.scrollTop:0;
+  render();
+  // Restaurar el scroll después del render
+  if(scrollY>0){
+    setTimeout(function(){
+      var newLista=document.getElementById("mkmSelMaqLista");
+      if(newLista)newLista.scrollTop=scrollY;
+    },0);
+  }
+}
 function abrirSelectorMaquinas(){
   // Copiar la selección actual como estado temporal (para permitir cancelar)
   S.dashboard.selectorMaqSeleccion=S.dashboard.maquinas.slice();
@@ -395,12 +408,12 @@ function toggleMaquinaSeleccion(nombre){
   var idx=sel.indexOf(nombre);
   if(idx>=0)sel.splice(idx,1);
   else sel.push(nombre);
-  render();
+  _renderPreservandoScroll();
 }
 function seleccionarTodasMaquinas(){
   // Vacío = todas (semánticamente igual)
   S.dashboard.selectorMaqSeleccion=[];
-  render();
+  _renderPreservandoScroll();
 }
 function seleccionarMaquinasVisibles(){
   // Selecciona las máquinas que hacen match con el buscador actual
@@ -411,7 +424,7 @@ function seleccionarMaquinasVisibles(){
     return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
   }).map(function(m){return m.maquina;});
   S.dashboard.selectorMaqSeleccion=visibles;
-  render();
+  _renderPreservandoScroll();
 }
 function actualizarBusquedaMaq(){
   var i=document.getElementById("dashMaqBusq");
@@ -1277,7 +1290,7 @@ function buildSelectorMaquinasModal(){
       +'<button id="btnAplicarMaqSel" style="width:100%;padding:12px;font-size:14px;font-weight:700;border:none;border-radius:8px;background:#1D9E75;color:#fff;cursor:pointer">'+aplicarLabel+'</button>'
       +'</div>';
 
-    body=buscador+accRapidas+'<div style="max-height:55vh;overflow-y:auto;padding-right:4px">'+listaHtml+'</div>'+aplicarBtn;
+    body=buscador+accRapidas+'<div id="mkmSelMaqLista" style="max-height:55vh;overflow-y:auto;padding-right:4px">'+listaHtml+'</div>'+aplicarBtn;
   }
 
   return '<div id="mkmSelMaqBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1001;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
