@@ -293,6 +293,10 @@ var S = {
     busquedaQuery:"",
     busquedaResultados:[],
     busquedaLoading:false,
+    // v11.20: Diagnóstico
+    diagOpen:false,
+    diagLoading:false,
+    diagData:null,
     piezaModalCache:{}  // cache local, invalida al cambiar filtros del dashboard
   },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
@@ -649,6 +653,109 @@ function dashSeleccionarParte(np,op){
   // Cerrar modal de búsqueda y abrir el modal de detalle de parte
   S.dashboard.busquedaOpen=false;
   abrirModalPieza(null,np,op,null);
+}
+
+// v11.20: Diagnóstico
+function abrirDiagnostico(){
+  S.dashboard.diagOpen=true;
+  S.dashboard.diagLoading=true;
+  S.dashboard.diagData=null;
+  render();
+  var d=S.dashboard;
+  var params={action:"diagnostico",periodo:d.periodo};
+  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  apiGet(params)
+    .then(function(r){
+      S.dashboard.diagData=r;
+      S.dashboard.diagLoading=false;
+      render();
+    })
+    .catch(function(){
+      S.dashboard.diagLoading=false;
+      render();
+    });
+}
+function cerrarDiagnostico(){
+  S.dashboard.diagOpen=false;
+  S.dashboard.diagData=null;
+  render();
+}
+function limpiarCacheDash(){
+  apiGet({action:"limpiarCache"}).then(function(r){
+    alert(r.mensaje||"Caché limpiado. Refresca el dashboard.");
+    S.dashboard.diagOpen=false;
+    cargarDashboard();
+  });
+}
+function buildDiagModal(){
+  var d=S.dashboard;
+  var body="";
+  if(d.diagLoading){
+    body='<div style="text-align:center;padding:2rem;color:#888">Analizando reportes...</div>';
+  }else if(d.diagData&&d.diagData.ok){
+    var dg=d.diagData.diagnostico||{};
+    var total=dg.totalFilas||0;
+    var proc=dg.procesados||0;
+    var pct=total>0?Math.round((proc/total)*100):0;
+    var pctColor=pct>=95?"#0F6E56":(pct>=80?"#BA7517":"#A32D2D");
+    var kpi=function(l,v,c){
+      return '<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:10px;text-align:center">'
+        +'<div style="font-size:10px;color:#888;font-weight:600;letter-spacing:0.5px">'+l+'</div>'
+        +'<div style="font-size:20px;font-weight:700;color:'+(c||"#222")+';margin-top:2px">'+v+'</div></div>';
+    };
+    body='<div style="font-size:12px;color:#666;margin-bottom:12px">📅 Rango: <b>'+_esc(d.diagData.rango.desde)+'</b> hasta <b>'+_esc(d.diagData.rango.hasta)+'</b></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px">'
+      +kpi("TOTAL FILAS",total,"#333")
+      +kpi("PROCESADOS",proc+" ("+pct+"%)",pctColor)
+      +kpi("FUERA DEL RANGO",dg.fechaFueraRango||0,"#888")
+      +kpi("MÁQUINA NO EN CATÁLOGO",dg.maquinaNoEnCatalogo||0,(dg.maquinaNoEnCatalogo>0?"#A32D2D":"#888"))
+      +'</div>';
+
+    // Fechas fuera del rango (ejemplos)
+    if(dg.fechasFueraEjemplos&&dg.fechasFueraEjemplos.length>0){
+      body+='<div style="background:#FAEEDA;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+        +'<div style="font-size:11px;color:#854F0B;font-weight:700;margin-bottom:4px">📅 Ejemplos de fechas fuera del rango:</div>'
+        +'<div style="font-size:12px;color:#555">'+dg.fechasFueraEjemplos.map(_esc).join(" · ")+'</div>'
+        +'</div>';
+    }
+
+    // Problemas de nombres de máquinas
+    if(d.diagData.problemasNombres&&d.diagData.problemasNombres.length>0){
+      body+='<div style="background:#FCEBEB;border-radius:8px;padding:12px;margin-bottom:10px">'
+        +'<div style="font-size:12px;color:#A32D2D;font-weight:700;margin-bottom:6px">⚠️ Nombres de máquina en reportes que no existen en el catálogo:</div>';
+      d.diagData.problemasNombres.forEach(function(p){
+        var match=p.posibleMatch?' → <b style="color:#0F6E56">¿es "'+_esc(p.posibleMatch)+'"?</b>':' <span style="color:#888">(no hay match similar)</span>';
+        body+='<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.05)">"<b>'+_esc(p.nombreEnReporte)+'</b>" · '+p.apariciones+' reportes'+match+'</div>';
+      });
+      body+='<div style="font-size:11px;color:#888;margin-top:8px">💡 Revisa la ortografía en los reportes de esta máquina.</div>'
+        +'</div>';
+    }
+
+    // Máquinas con reportes procesados
+    if(d.diagData.maquinasConReportes&&d.diagData.maquinasConReportes.length>0){
+      body+='<div style="background:#E1F5EE;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+        +'<div style="font-size:11px;color:#0F6E56;font-weight:700;margin-bottom:4px">✓ Máquinas con reportes procesados ('+d.diagData.maquinasConReportes.length+'):</div>'
+        +'<div style="font-size:12px;color:#555">'+d.diagData.maquinasConReportes.map(_esc).join(" · ")+'</div>'
+        +'</div>';
+    }
+
+    // Botón limpiar caché
+    body+='<div style="border-top:1px solid #eee;padding-top:12px;margin-top:8px">'
+      +'<button id="btnLimpiarCache" style="width:100%;padding:10px;background:#185FA5;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">🔄 Limpiar caché y recargar</button>'
+      +'<div style="font-size:10px;color:#888;text-align:center;margin-top:6px">Útil si acabas de modificar el catálogo de máquinas o partes</div>'
+      +'</div>';
+  }else{
+    body='<div style="text-align:center;padding:2rem;color:#A32D2D">Error al cargar diagnóstico</div>';
+  }
+  return '<div id="mkmDiagBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1010;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:560px;width:100%;margin-top:20px;padding:20px 22px;max-height:85vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div><div style="font-size:16px;font-weight:700">🔧 Diagnóstico de lectura</div>'
+    +'<div style="font-size:11px;color:#888;margin-top:2px">Qué reportes lee la app en el rango actual</div></div>'
+    +'<button id="btnCerrarDiag" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
 }
 function buildBuscarParteModal(){
   var d=S.dashboard;
@@ -1431,8 +1538,13 @@ function buildDashboard(){
   if(d.busquedaOpen){
     busquedaModal=buildBuscarParteModal();
   }
+  // v11.20: Modal de diagnóstico
+  var diagModal="";
+  if(d.diagOpen){
+    diagModal=buildDiagModal();
+  }
 
-  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal+busquedaModal;
+  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal+busquedaModal+diagModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1442,6 +1554,7 @@ function wrapDashboard(content,periodoLabel){
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
     +'<div style="display:flex;align-items:center;gap:6px" class="mkm-header-buttons">'
     +'<button id="btnBuscarParte" style="font-size:14px;background:#E1F5EE;border:1px solid #B8E4CF;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0F6E56;font-weight:600" title="Buscar por número de parte">🔍 Parte</button>'
+    +'<button id="btnDiagDash" style="font-size:14px;background:#FAEEDA;border:1px solid #EEDCB3;border-radius:8px;cursor:pointer;padding:6px 10px;color:#854F0B;font-weight:600" title="Diagnóstico: qué reportes lee la app">🔧</button>'
     +'<button id="btnExportarPDF" style="font-size:14px;background:#E6F1FB;border:1px solid #B4D3EE;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0C447C;font-weight:600" title="Exportar / Imprimir como PDF">📄 PDF</button>'
     +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
     +'<button class="refresh-btn" id="btnRefreshDash">↻</button>'
@@ -2522,6 +2635,15 @@ function bindResumen(){
   document.querySelectorAll(".mkm-busq-op-btn").forEach(function(el){
     el.addEventListener("click",function(){dashSeleccionarParte(el.dataset.mkmNp,el.dataset.mkmOp);});
   });
+  // v11.20: Diagnóstico
+  var bDiag=document.getElementById("btnDiagDash");
+  if(bDiag)bDiag.addEventListener("click",abrirDiagnostico);
+  var bDiagCer=document.getElementById("btnCerrarDiag");
+  if(bDiagCer)bDiagCer.addEventListener("click",cerrarDiagnostico);
+  var bgDiag=document.getElementById("mkmDiagBg");
+  if(bgDiag)bgDiag.addEventListener("click",function(e){if(e.target.id==="mkmDiagBg")cerrarDiagnostico();});
+  var bLimp=document.getElementById("btnLimpiarCache");
+  if(bLimp)bLimp.addEventListener("click",limpiarCacheDash);
 }
 
 // ============================================================
