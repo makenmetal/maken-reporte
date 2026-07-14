@@ -2617,8 +2617,13 @@ function buildSelectorMaquinasModal(){
     body='<div style="padding:3rem;text-align:center;color:#888">Cargando catálogo de máquinas...</div>';
   }else{
     var q=(d.selectorMaqBusqueda||"").toLowerCase();
+    // v11.28: Filtrar Secundarias del dashboard
+    var maqPrincipales=cat.filter(function(m){
+      var t=String(m.tipo||"Principal").trim().toLowerCase();
+      return t!=="secundaria";
+    });
     // Filtrar por búsqueda
-    var maqFiltradas=cat.filter(function(m){
+    var maqFiltradas=maqPrincipales.filter(function(m){
       if(!q)return true;
       return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
     });
