@@ -1739,7 +1739,8 @@ function dashResumenCard(data,cards){
   var totalHrs=0,totalHProd=0,totalHSet=0,totalHOver=0,totalHManto=0,totalHIdle=0,totalPiezas=0;
   cards.forEach(function(c){
     totalHrs+=c.totalHrs||0;
-    totalHProd+=c.hProd||0;
+    // v11.27: hOtro se suma dentro de hProd para la distribución visual
+    totalHProd+=(c.hProd||0)+(c.hOtro||0);
     totalHSet+=c.hSet||0;
     totalHOver+=c.hOver||0;
     totalHManto+=c.hManto||0;
@@ -1828,7 +1829,9 @@ function dashMaqCard(c){
     ? { bg: "#FBECEC", fg: "#7A2E2E" }  // Rojizo suave para N/A por manto
     : _effColor(c.eff);
   var total=c.totalHrs||0.001;
-  var pP=(c.hProd/total*100);
+  // v11.27: Las horas de "Otro" se suman a Producción en la distribución visual
+  var hProdVis=(c.hProd||0)+(c.hOtro||0);
+  var pP=(hProdVis/total*100);
   var pS=(c.hSet/total*100);
   var pO=(c.hOver/total*100);
   var pM=((c.hManto||0)/total*100);
@@ -1852,7 +1855,7 @@ function dashMaqCard(c){
       +'<span style="font-size:11px;color:#222"><span style="font-weight:600">'+val.toFixed(1)+'h</span> <span style="color:#888">('+Math.round(pct)+'%)</span></span></div>';
   };
   var legend='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-bottom:12px">'
-    +legendRow(COL_PROD,"Producción",c.hProd,pP)
+    +legendRow(COL_PROD,"Producción",hProdVis,pP)
     +legendRow(COL_SET,"Montaje",c.hSet,pS)
     +legendRow(COL_OVER,"Sobre-setup",c.hOver,pO)
     +legendRow(COL_MANTO,"Manto",c.hManto||0,pM)
@@ -2008,7 +2011,9 @@ function buildMaquinaModal(){
     // DISTRIBUCIÓN DE HORAS — más protagonista visual (barra grande + turnos)
     // ==================================================================
     var totHrs=res.totalHrs||0.001;
-    var pP=(res.hProd/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pM=((res.hManto||0)/totHrs*100),pI=(res.hIdle/totHrs*100);
+    // v11.27: hOtro se suma a hProd en la distribución visual
+    var hProdVis=(res.hProd||0)+(res.hOtro||0);
+    var pP=(hProdVis/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pM=((res.hManto||0)/totHrs*100),pI=(res.hIdle/totHrs*100);
 
     // Helper: bloque distribución con barra grande
     var buildDistr=function(titulo,badge,sub,hrs,vals,pcts,esTotal){
@@ -2042,7 +2047,7 @@ function buildMaquinaModal(){
     var distr='<p style="font-size:13px;color:#333;font-weight:700;margin:0 0 10px">⚙️ Distribución de horas</p>'
       +buildDistr("Total del periodo",null,totHrs.toFixed(1)+'h totales',
         totHrs.toFixed(1)+'h',
-        {hProd:res.hProd,hSet:res.hSet,hOver:res.hOver,hManto:res.hManto,hIdle:res.hIdle},
+        {hProd:hProdVis,hSet:res.hSet,hOver:res.hOver,hManto:res.hManto,hIdle:res.hIdle},
         {pP:pP,pS:pS,pO:pO,pM:pM,pI:pI},true);
 
     // v11.8: Desglose por turno (si hay data)
@@ -2051,8 +2056,10 @@ function buildMaquinaModal(){
       if(porTurno[t]){
         var pt=porTurno[t];
         var pth=pt.totalHrs||0.001;
+        // v11.27: hOtro se suma a hProd por turno también
+        var ptHProdVis=(pt.hProd||0)+(pt.hOtro||0);
         var ptPcts={
-          pP:(pt.hProd/pth*100),pS:(pt.hSet/pth*100),
+          pP:(ptHProdVis/pth*100),pS:(pt.hSet/pth*100),
           pO:(pt.hOver/pth*100),pM:((pt.hManto||0)/pth*100),
           pI:(pt.hIdle/pth*100)
         };
@@ -2063,7 +2070,7 @@ function buildMaquinaModal(){
           {bg:badgeCol.bg,fg:badgeCol.fg,txt:effTxt},
           pt.turnos+" día"+(pt.turnos>1?"s":"")+" · "+(pt.piezas||0).toLocaleString("es-MX")+" pzs",
           pt.totalHrs.toFixed(1)+'h',
-          {hProd:pt.hProd,hSet:pt.hSet,hOver:pt.hOver,hManto:pt.hManto,hIdle:pt.hIdle},
+          {hProd:ptHProdVis,hSet:pt.hSet,hOver:pt.hOver,hManto:pt.hManto,hIdle:pt.hIdle},
           ptPcts,false);
       }
     });
