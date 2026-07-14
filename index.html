@@ -1874,20 +1874,28 @@ function dashMaqCard(c){
   var effLabel = esNA ? 'NO APLICA · MANTO ≥ 90%' : 'EFICIENCIA';
   var effFontSize = esNA ? '30px' : '36px';
 
-  // v11.18: Badge de eficiencia recalibrada bajo el % principal
-  // Solo se muestra si hay al menos 1 medición aplicable y no es N/A
+  // v11.26: Badge de eficiencia recalibrada bajo el % principal
+  // Solo se muestra si la cobertura de mediciones es ≥ 90% (mínimo estadístico
+  // para que la recalibración sea representativa de toda la operación).
   var recBadge="";
-  if(!esNA&&c.effRecalibrada!==null&&c.effRecalibrada!==undefined&&(c.partesConMedicion||0)>0){
-    var effRec=c.effRecalibrada;
-    var diff=effRec-c.eff;
-    var recBg="#E6F1FB",recFg="#0C447C",recFlecha="≈";
-    if(diff<-2){recBg="#FCEBEB";recFg="#A32D2D";recFlecha="↓";}
-    else if(diff>2){recBg="#E1F5EE";recFg="#0F6E56";recFlecha="↑";}
-    var diffTxt=(diff>=0?"+":"")+diff;
-    recBadge='<div style="display:flex;justify-content:space-between;align-items:center;background:'+recBg+';border-radius:6px;padding:6px 10px;margin-top:-6px;margin-bottom:10px;font-size:11px">'
-      +'<span style="color:'+recFg+';font-weight:600">Recalibrada: <b>'+effRec+'%</b></span>'
-      +'<span style="color:'+recFg+';font-weight:600">'+recFlecha+' '+diffTxt+' pts</span>'
-      +'</div>';
+  var UMBRAL_COBERTURA_RECALIB=90;  // %
+  if(!esNA&&c.effRecalibrada!==null&&c.effRecalibrada!==undefined){
+    var pConM=c.partesConMedicion||0;
+    var pSinM=c.partesSinMedicion||0;
+    var totalP=pConM+pSinM;
+    var cobPct=totalP>0?Math.round((pConM/totalP)*100):0;
+    if(cobPct>=UMBRAL_COBERTURA_RECALIB){
+      var effRec=c.effRecalibrada;
+      var diff=effRec-c.eff;
+      var recBg="#E6F1FB",recFg="#0C447C",recFlecha="≈";
+      if(diff<-2){recBg="#FCEBEB";recFg="#A32D2D";recFlecha="↓";}
+      else if(diff>2){recBg="#E1F5EE";recFg="#0F6E56";recFlecha="↑";}
+      var diffTxt=(diff>=0?"+":"")+diff;
+      recBadge='<div style="display:flex;justify-content:space-between;align-items:center;background:'+recBg+';border-radius:6px;padding:6px 10px;margin-top:-6px;margin-bottom:10px;font-size:11px">'
+        +'<span style="color:'+recFg+';font-weight:600">Recalibrada: <b>'+effRec+'%</b></span>'
+        +'<span style="color:'+recFg+';font-weight:600">'+recFlecha+' '+diffTxt+' pts</span>'
+        +'</div>';
+    }
   }
 
   // v11.9: La actividad detallada solo se muestra en el modal de detalle,
@@ -1936,7 +1944,7 @@ function buildMaquinaModal(){
       +'<div style="font-size:11px;color:'+col.fg+';margin-top:6px;letter-spacing:0.5px;font-weight:600">'+effLblModal+'</div>'
       +'</div>';
 
-    // v11.19: Bloque de Eficiencia Recalibrada (mensajes cortos, detalle en manual)
+    // v11.26: Bloque de Eficiencia Recalibrada — requiere cobertura ≥ 90%
     var efMax="";
     if(res.effRecalibrada!==null&&res.effRecalibrada!==undefined&&!esNAModal){
       var effRec=res.effRecalibrada;
@@ -1944,31 +1952,39 @@ function buildMaquinaModal(){
       var pConM=res.partesConMedicion||0;
       var pSinM=res.partesSinMedicion||0;
       var totalP=pConM+pSinM;
-      var diff=effRec-effAct;
-      var flechaTxt="",flechaColor="#0C447C",mensaje="";
-      if(diff<-2){
-        flechaTxt="↓ "+diff+" pts";
-        flechaColor="#A32D2D";
-        mensaje="Catálogo sobrestima el tiempo por pieza.";
-      }else if(diff>2){
-        flechaTxt="↑ +"+diff+" pts";
-        flechaColor="#0F6E56";
-        mensaje="Catálogo subestima el tiempo por pieza.";
-      }else{
-        flechaTxt="≈ "+(diff>=0?"+":"")+diff+" pts";
-        flechaColor="#0C447C";
-        mensaje="Catálogo bien calibrado.";
-      }
-      var cobTxt=(totalP===0)?"Sin mediciones":(pConM+"/"+totalP+" partes con TC medido");
+      var cobPct=totalP>0?Math.round((pConM/totalP)*100):0;
+      var UMBRAL_COB=90;
 
-      efMax='<div style="background:#fafaf9;border-radius:12px;border-left:4px solid #185FA5;padding:12px 16px;margin-bottom:16px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
-        +'<div><div style="font-size:11px;color:#888;font-weight:700;letter-spacing:0.5px">EFICIENCIA RECALIBRADA</div>'
-        +'<div style="font-size:10px;color:#888;margin-top:2px">'+mensaje+' <span style="color:#aaa">· '+cobTxt+'</span></div></div>'
-        +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
-        +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+'</div></div>'
-        +'</div>'
-        +'</div>';
+      if(cobPct>=UMBRAL_COB){
+        var diff=effRec-effAct;
+        var flechaTxt="",flechaColor="#0C447C",mensaje="";
+        if(diff<-2){
+          flechaTxt="↓ "+diff+" pts";
+          flechaColor="#A32D2D";
+          mensaje="Catálogo sobrestima el tiempo por pieza.";
+        }else if(diff>2){
+          flechaTxt="↑ +"+diff+" pts";
+          flechaColor="#0F6E56";
+          mensaje="Catálogo subestima el tiempo por pieza.";
+        }else{
+          flechaTxt="≈ "+(diff>=0?"+":"")+diff+" pts";
+          flechaColor="#0C447C";
+          mensaje="Catálogo bien calibrado.";
+        }
+        efMax='<div style="background:#fafaf9;border-radius:12px;border-left:4px solid #185FA5;padding:12px 16px;margin-bottom:16px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+          +'<div><div style="font-size:11px;color:#888;font-weight:700;letter-spacing:0.5px">EFICIENCIA RECALIBRADA</div>'
+          +'<div style="font-size:10px;color:#888;margin-top:2px">'+mensaje+' <span style="color:#aaa">· '+pConM+'/'+totalP+' partes ('+cobPct+'%)</span></div></div>'
+          +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
+          +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+'</div></div>'
+          +'</div>'
+          +'</div>';
+      }else if(totalP>0){
+        // Cobertura insuficiente — mensaje corto explicando por qué no hay recalibración
+        efMax='<div style="background:#FAEEDA;border-radius:8px;border-left:3px solid #BA7517;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#854F0B">'
+          +'<b>Recalibración no disponible.</b> Cobertura de mediciones TC: <b>'+cobPct+'%</b> ('+pConM+'/'+totalP+' partes). Se requiere ≥'+UMBRAL_COB+'% para recalibrar.'
+          +'</div>';
+      }
     }
 
     var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_MANTO="#D4544E", COL_IDLE="#F0997B";
@@ -2061,12 +2077,20 @@ function buildMaquinaModal(){
     }else{
       actsBlock+='<div style="max-height:240px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
         +acts.map(function(a){
-          var horasCell=a.sinStd
-            ? '<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>'
-            : '<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
-          var pzasCell=a.sinStd?'<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>':'';
+          // v11.25: "Otro" muestra las horas reales (no SIN ESTÁNDAR)
+          var esOtro=a.esOtro||(String(a.np||"").indexOf("Otro")===0);
+          var horasCell;
+          var pzasCell="";
+          if(a.sinStd){
+            horasCell='<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>';
+            pzasCell='<div style="color:#666;font-size:11px;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs</div>';
+          }else if(esOtro){
+            horasCell='<div style="color:#0C447C;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;margin-left:2px">OTRO</span></div>';
+          }else{
+            horasCell='<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
+          }
           return '<div class="mkm-act-row" data-mkm-pieza-maq="'+_esc(mm.maquina)+'" data-mkm-pieza-np="'+_esc(a.np)+'" data-mkm-pieza-op="'+_esc(a.op)+'" data-mkm-pieza-resp="'+_esc(a.resp)+'" style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;cursor:pointer;align-items:center;border-radius:6px;transition:background 0.15s">'
-            +'<div><div style="color:'+(a.sinStd?"#854F0B":"#222")+';font-weight:500">'+_esc(a.respName||a.resp)+'</div>'
+            +'<div><div style="color:'+(a.sinStd?"#854F0B":(esOtro?"#0C447C":"#222"))+';font-weight:500">'+_esc(a.respName||a.resp)+'</div>'
             +'<div style="color:#888;font-size:11px">'+_esc(a.np)+' · op '+_esc(a.op)+'</div>'
             +pzasCell+'</div>'
             +horasCell
@@ -2476,26 +2500,30 @@ function buildAyudaDashModal(){
 
   // Sección 2: Fórmula
   body+=sec("Cálculo de la eficiencia",
-    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">La eficiencia mide qué tan bien se usó el tiempo <b>realmente disponible</b> para operar (producción + montaje normal).</p>'
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">La eficiencia mide qué tan bien se usó el tiempo <b>realmente disponible</b> para operar (producción + montaje normal + partes ad-hoc).</p>'
     +formula("Eficiencia % = (Horas Operadas / Horas Disponibles) × 100")
-    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Operadas</b> = producción + montaje normal (setup ≤ 1.5h por reporte):</p>'
-    +formula("Horas Operadas = Horas Producción + Horas Montaje")
-    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Producción</b> se calculan por cada reporte:</p>'
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Operadas</b> = producción + montaje normal + partes "Otro":</p>'
+    +formula("Horas Operadas = Horas Producción + Horas Montaje + Horas Otro")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Producción</b> (partes con estándar) se calculan por cada reporte:</p>'
     +formula("Horas Producción = (Piezas × TiempoCiclo del catálogo) / 60")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Otro</b> = las horas que el operador reporta manualmente cuando la parte es <b>"Otro"</b> (refacciones, prototipos, retrabajos sin catálogo).</p>'
     +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Disponibles</b> descuentan el manto (porque la máquina no estaba operativa):</p>'
     +formula("Horas Disponibles = (9.5h × N° turnos) − Horas Manto")
     +'<p style="font-size:11px;color:#888;margin-top:8px">⚠️ El <b>sobre-setup</b> (setup que excede 1.5h por reporte) NO cuenta como operado.</p>'
-    +'<p style="font-size:11px;color:#888;margin-top:8px">Ejemplo: 2 turnos (19h), 3h de manto, 12h producción + 1h montaje → <b>Eficiencia = 13/(19−3) = 81%</b></p>'
+    +'<p style="font-size:11px;color:#888;margin-top:8px">Ejemplo: 2 turnos (19h), 3h de manto, 12h producción + 1h montaje + 2h "Otro" → <b>Eficiencia = 15/(19−3) = 94%</b></p>'
   );
 
   // Sección 3: Composición de las 9.5h
   body+=sec("Distribución de las 9.5 horas por turno",
-    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 10px">Cada turno se compone de estas 5 categorías (la barra de colores en cada tarjeta):</p>'
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 10px">Cada turno se compone de estas categorías (la barra de colores en cada tarjeta):</p>'
     +catItem("#1D9E75","Producción","Tiempo estándar equivalente a las piezas producidas. <b>Cuenta como operado.</b>")
     +catItem("#888780","Montaje","Horas de setup hasta <b>1.5h</b> por reporte. <b>Cuenta como operado.</b>")
-    +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. NO cuenta como operado (tiempo perdido).")
+    +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. NO cuenta como operado.")
     +catItem("#D4544E","Manto","Horas registradas en reportes tipo Mantenimiento. Se <b>descuentan del denominador</b>.")
-    +catItem("#F0997B","Ocioso","Horas sin justificar: 9.5h menos todo lo anterior. Refleja tiempo muerto o subutilizado.")
+    +catItem("#F0997B","Ocioso","Horas sin justificar: 9.5h menos todo lo anterior.")
+    +'<p style="font-size:12px;color:#555;line-height:1.5;margin:10px 0 6px">Además, en la lista de actividad se marcan dos casos especiales:</p>'
+    +catItem("#0C447C","Otro","Piezas ad-hoc (refacciones, prototipos, retrabajos). El operador reporta las horas manualmente y <b>cuentan como operadas</b>.")
+    +catItem("#854F0B","Sin Estándar","Parte + operación con estándar faltante en el catálogo. Piezas visibles pero <b>NO cuentan</b>. Actualiza el catálogo.")
   );
 
   // Sección 4: Reglas de N/A
@@ -2537,6 +2565,7 @@ function buildAyudaDashModal(){
     +'<p style="font-size:12px;color:#555;margin:8px 0 4px">Fórmula:</p>'
     +formula("Eficiencia recalibrada = Σ(piezas × TC medido / 60) / hDisponible × 100")
     +'<p style="font-size:12px;color:#555;line-height:1.5;margin:10px 0 4px">Sólo se usan mediciones de los <b>últimos 6 meses</b>. Si una parte+op no tiene mediciones, se usa su TC del catálogo como respaldo.</p>'
+    +'<p style="font-size:12px;color:#555;line-height:1.5;margin:12px 0 4px"><b>⚠️ Regla de cobertura mínima:</b> la recalibración solo se muestra si al menos el <b>90% de las partes+op</b> que corrieron en la máquina tienen TC medido. Con menos, el número no sería representativo (un promedio de 2 partes de 9 no refleja la realidad de la operación completa).</p>'
     +'<p style="font-size:12px;color:#555;margin:12px 0 4px"><b>Interpretación de la diferencia:</b></p>'
     +regla("↑","Recalibrada > catálogo",
       "Los TC medidos son <b>mayores</b> que el catálogo. Cada pieza toma más tiempo del que el estándar indica → el catálogo <b>subestima</b> el tiempo real y debería actualizarse.")
@@ -2544,7 +2573,6 @@ function buildAyudaDashModal(){
       "Los TC medidos son <b>menores</b> que el catálogo. La producción va más rápido que el estándar → el catálogo <b>sobrestima</b> el tiempo (la eficiencia arriba puede ser engañosamente alta).")
     +regla("≈","Recalibrada ≈ catálogo",
       "Los TC medidos coinciden con el catálogo (±2 puntos). El estándar está bien calibrado.")
-    +'<p style="font-size:11px;color:#888;margin-top:8px">La cobertura muestra cuántas partes+op de las que corrieron en la máquina tienen mediciones. A mayor cobertura, más confiable el número.</p>'
   );
 
   // Sección 7: Filtros
