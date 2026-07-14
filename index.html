@@ -1710,10 +1710,9 @@ function wrapDashboard(content,periodoLabel){
     +'<div class="mkm-dash-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
     +'<div><span style="font-weight:700;font-size:20px;display:block">Dashboard</span>'
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
-    +'<div style="display:flex;align-items:center;gap:6px" class="mkm-header-buttons">'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end" class="mkm-header-buttons">'
     +'<button id="btnBuscarParte" style="font-size:14px;background:#E1F5EE;border:1px solid #B8E4CF;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0F6E56;font-weight:600" title="Buscar por número de parte">🔍 Parte</button>'
     +'<button id="btnReporteTC" style="font-size:14px;background:#EDE7F6;border:1px solid #C9BEE0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#4A2E8B;font-weight:600" title="Reporte diario de mediciones TC del ingeniero">📋 TC</button>'
-    +'<button id="btnDiagDash" style="font-size:14px;background:#FAEEDA;border:1px solid #EEDCB3;border-radius:8px;cursor:pointer;padding:6px 10px;color:#854F0B;font-weight:600" title="Diagnóstico: qué reportes lee la app">🔧</button>'
     +'<button id="btnExportarPDF" style="font-size:14px;background:#E6F1FB;border:1px solid #B4D3EE;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0C447C;font-weight:600" title="Exportar / Imprimir como PDF">📄 PDF</button>'
     +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
     +'<button class="refresh-btn" id="btnRefreshDash">↻</button>'
@@ -1779,7 +1778,7 @@ function dashResumenCard(data,cards){
     +legendRow(COL_PROD,"Producción",totalHProd,pP)
     +legendRow(COL_SET,"Montaje",totalHSet,pS)
     +legendRow(COL_OVER,"Sobre-setup",totalHOver,pO)
-    +legendRow(COL_MANTO,"Manto",totalHManto,pM)
+    +legendRow(COL_MANTO,"Paro Manto",totalHManto,pM)
     +legendRow(COL_IDLE,"Ocioso",totalHIdle,pI)
     +'</div>';
 
@@ -1858,7 +1857,7 @@ function dashMaqCard(c){
     +legendRow(COL_PROD,"Producción",hProdVis,pP)
     +legendRow(COL_SET,"Montaje",c.hSet,pS)
     +legendRow(COL_OVER,"Sobre-setup",c.hOver,pO)
-    +legendRow(COL_MANTO,"Manto",c.hManto||0,pM)
+    +legendRow(COL_MANTO,"Paro Manto",c.hManto||0,pM)
     +legendRow(COL_IDLE,"Ocioso",c.hIdle,pI)
     +'</div>';
 
@@ -1869,12 +1868,12 @@ function dashMaqCard(c){
   // La explicación de la fórmula está en el modal de Manual (botón ? en header).
   var infoDisp='';
   if(esNA){
-    infoDisp='<div style="font-size:10px;color:#7A2E2E;margin-top:-4px;margin-bottom:6px;font-weight:600">Máquina prácticamente todo el periodo en manto ('+c.hManto.toFixed(1)+'h de '+c.totalHrs.toFixed(1)+'h).</div>';
+    infoDisp='<div style="font-size:10px;color:#7A2E2E;margin-top:-4px;margin-bottom:6px;font-weight:600">Máquina prácticamente todo el periodo en paro por manto ('+c.hManto.toFixed(1)+'h de '+c.totalHrs.toFixed(1)+'h).</div>';
   }
 
   // Valor de eficiencia grande: número o "N/A"
   var effValor = esNA ? 'N/A' : (c.eff + '%');
-  var effLabel = esNA ? 'NO APLICA · MANTO ≥ 90%' : 'EFICIENCIA';
+  var effLabel = esNA ? 'PARO · MANTO ≥ 90%' : 'EFICIENCIA';
   var effFontSize = esNA ? '30px' : '36px';
 
   // v11.26: Badge de eficiencia recalibrada bajo el % principal
@@ -1938,7 +1937,7 @@ function buildMaquinaModal(){
       : _effColor(res.eff||0);
     var effTxtModal = esNAModal ? 'N/A' : (res.eff||0)+'%';
     var effLblModal = esNAModal
-      ? 'NO APLICA · MANTO ≥ 90%'
+      ? 'PARO · MANTO ≥ 90%'
       : 'EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas';
 
     // Header con eficiencia grande
@@ -2038,7 +2037,7 @@ function buildMaquinaModal(){
         +_distrRow(COL_PROD,"Producción",vals.hProd,pcts.pP)
         +_distrRow(COL_SET,"Montaje",vals.hSet,pcts.pS)
         +_distrRow(COL_OVER,"Sobre-setup",vals.hOver,pcts.pO)
-        +_distrRow(COL_MANTO,"Manto",vals.hManto||0,pcts.pM)
+        +_distrRow(COL_MANTO,"Paro Manto",vals.hManto||0,pcts.pM)
         +_distrRow(COL_IDLE,"Ocioso",vals.hIdle,pcts.pI)
         +'</div>'
         +'</div>';
@@ -2106,7 +2105,36 @@ function buildMaquinaModal(){
         }).join("")+'</div>';
     }
 
-    body=header+efMax+chart+distr+actsBlock;
+    // v11.29: Bloque de reportes de Paro Manto + Montaje (para diagnóstico)
+    var msBlock="";
+    var actsMS=res.actsMantoSetup||[];
+    if(actsMS.length>0){
+      // Ordenar: manto primero, luego por fecha
+      actsMS.sort(function(a,b){
+        if(a.kind!==b.kind)return a.kind==="manto"?-1:1;
+        if(a.fecha!==b.fecha)return a.fecha<b.fecha?-1:1;
+        return (a.turno||"")<(b.turno||"")?-1:1;
+      });
+      var nManto=actsMS.filter(function(r){return r.kind==="manto";}).length;
+      var nSetup=actsMS.length-nManto;
+      msBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">🔧 Reportes de Paro Manto y Montaje '
+        +'<span style="font-size:10px;color:#888;font-weight:500">· '+nManto+' manto, '+nSetup+' montaje</span></p>'
+        +'<div style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
+        +actsMS.map(function(r){
+          var color=r.kind==="manto"?"#D4544E":"#888780";
+          var bg=r.kind==="manto"?"#FCEBEB":"#F5F5F3";
+          var fg=r.kind==="manto"?"#7A2E2E":"#555";
+          var badge=r.kind==="manto"?"PARO MANTO":"MONTAJE";
+          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;align-items:center">'
+            +'<div><div style="color:#222;font-weight:500">'+_esc(r.respName||r.resp)+'</div>'
+            +'<div style="color:#888;font-size:11px">'+_esc(r.fecha)+' · '+_esc(r.turno)+' · '+_esc(r.detalle||"-")+'</div></div>'
+            +'<div style="text-align:right"><div style="color:'+fg+';font-weight:600;font-variant-numeric:tabular-nums">'+(r.hrs||0).toFixed(2)+'h</div>'
+            +'<span style="background:'+bg+';color:'+fg+';padding:1px 6px;border-radius:3px;font-weight:700;font-size:9px">'+badge+'</span></div>'
+            +'</div>';
+        }).join("")+'</div>';
+    }
+
+    body=header+efMax+chart+distr+actsBlock+msBlock;
     if(res.sinStd>0){
       body+='<div style="font-size:11px;padding:8px 10px;border-radius:6px;margin-top:12px;background:#FAEEDA;color:#854F0B">⚠ '+res.sinStd+' reporte'+(res.sinStd>1?'s':'')+' sin estándar en catálogo (visibles en la lista arriba)</div>';
     }
@@ -2526,7 +2554,7 @@ function buildAyudaDashModal(){
     +catItem("#1D9E75","Producción","Tiempo estándar equivalente a las piezas producidas. <b>Cuenta como operado.</b>")
     +catItem("#888780","Montaje","Horas de setup hasta <b>1.5h</b> por reporte. <b>Cuenta como operado.</b>")
     +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. NO cuenta como operado.")
-    +catItem("#D4544E","Manto","Horas registradas en reportes tipo Mantenimiento. Se <b>descuentan del denominador</b>.")
+    +catItem("#D4544E","Paro Manto","Horas registradas en reportes tipo Mantenimiento. Se <b>descuentan del denominador</b>.")
     +catItem("#F0997B","Ocioso","Horas sin justificar: 9.5h menos todo lo anterior.")
     +'<p style="font-size:12px;color:#555;line-height:1.5;margin:10px 0 6px">Además, en la lista de actividad se marcan dos casos especiales:</p>'
     +catItem("#0C447C","Otro","Piezas ad-hoc (refacciones, prototipos, retrabajos). El operador reporta las horas manualmente y <b>cuentan como operadas</b>.")
