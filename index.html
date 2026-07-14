@@ -2105,31 +2105,34 @@ function buildMaquinaModal(){
         }).join("")+'</div>';
     }
 
-    // v11.29: Bloque de reportes de Paro Manto + Montaje (para diagnóstico)
+    // v11.31: Bloque de reportes de Paro Manto solamente (con clasificación)
     var msBlock="";
-    var actsMS=res.actsMantoSetup||[];
+    var actsMS=(res.actsMantoSetup||[]).filter(function(r){return r.kind==="manto";});
     if(actsMS.length>0){
-      // Ordenar: manto primero, luego por fecha
+      // Ordenar por fecha, luego turno
       actsMS.sort(function(a,b){
-        if(a.kind!==b.kind)return a.kind==="manto"?-1:1;
         if(a.fecha!==b.fecha)return a.fecha<b.fecha?-1:1;
         return (a.turno||"")<(b.turno||"")?-1:1;
       });
-      var nManto=actsMS.filter(function(r){return r.kind==="manto";}).length;
-      var nSetup=actsMS.length-nManto;
-      msBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">🔧 Reportes de Paro Manto y Montaje '
-        +'<span style="font-size:10px;color:#888;font-weight:500">· '+nManto+' manto, '+nSetup+' montaje</span></p>'
-        +'<div style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
+      // Helper: color por tipo de manto
+      var colorTipo=function(t){
+        var tl=(t||"").toLowerCase();
+        if(tl.indexOf("correctivo")===0)return{bg:"#FCEBEB",fg:"#A32D2D"};
+        if(tl.indexOf("preventivo")===0)return{bg:"#E1F5EE",fg:"#0F6E56"};
+        if(tl.indexOf("predictivo")===0)return{bg:"#EDE7F6",fg:"#4A2E8B"};
+        return{bg:"#F5F5F3",fg:"#666"};
+      };
+      msBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">🔧 Reportes de Paro Manto '
+        +'<span style="font-size:10px;color:#888;font-weight:500">· '+actsMS.length+' reporte'+(actsMS.length!==1?'s':'')+'</span></p>'
+        +'<div style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
         +actsMS.map(function(r){
-          var color=r.kind==="manto"?"#D4544E":"#888780";
-          var bg=r.kind==="manto"?"#FCEBEB":"#F5F5F3";
-          var fg=r.kind==="manto"?"#7A2E2E":"#555";
-          var badge=r.kind==="manto"?"PARO MANTO":"MONTAJE";
+          var tm=r.tipoManto||"Sin clasificar";
+          var c=colorTipo(tm);
           return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;align-items:center">'
             +'<div><div style="color:#222;font-weight:500">'+_esc(r.respName||r.resp)+'</div>'
-            +'<div style="color:#888;font-size:11px">'+_esc(r.fecha)+' · '+_esc(r.turno)+' · '+_esc(r.detalle||"-")+'</div></div>'
-            +'<div style="text-align:right"><div style="color:'+fg+';font-weight:600;font-variant-numeric:tabular-nums">'+(r.hrs||0).toFixed(2)+'h</div>'
-            +'<span style="background:'+bg+';color:'+fg+';padding:1px 6px;border-radius:3px;font-weight:700;font-size:9px">'+badge+'</span></div>'
+            +'<div style="color:#888;font-size:11px">'+_esc(r.fecha)+' · '+_esc(r.turno)
+            +' · <span style="background:'+c.bg+';color:'+c.fg+';padding:1px 6px;border-radius:3px;font-weight:600;font-size:10px">'+_esc(tm)+'</span></div></div>'
+            +'<div style="text-align:right"><div style="color:#7A2E2E;font-weight:600;font-variant-numeric:tabular-nums">'+(r.hrs||0).toFixed(2)+'h</div></div>'
             +'</div>';
         }).join("")+'</div>';
     }
