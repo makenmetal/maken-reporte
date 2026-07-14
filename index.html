@@ -711,6 +711,7 @@ function cerrarReporteTC(){
 }
 function cargarReporteTC(){
   S.dashboard.reporteTCLoading=true;
+  S.dashboard.reporteTCError=null;
   render();
   var d=S.dashboard;
   var params={action:"reporteMediciones",periodo:d.reporteTCPeriodo};
@@ -718,10 +719,14 @@ function cargarReporteTC(){
   apiGet(params)
     .then(function(r){
       S.dashboard.reporteTCData=r;
+      if(!r||!r.ok){
+        S.dashboard.reporteTCError=(r&&r.error)||"El backend devolvió una respuesta vacía";
+      }
       S.dashboard.reporteTCLoading=false;
       render();
     })
-    .catch(function(){
+    .catch(function(err){
+      S.dashboard.reporteTCError=String((err&&err.message)||err||"Error de red");
       S.dashboard.reporteTCLoading=false;
       render();
     });
@@ -762,6 +767,12 @@ function buildReporteTCModal(){
   var body="";
   if(d.reporteTCLoading){
     body='<div style="text-align:center;padding:2rem;color:#888">Cargando reporte...</div>';
+  }else if(d.reporteTCError){
+    body='<div style="background:#FCEBEB;border-left:3px solid #A32D2D;border-radius:6px;padding:14px;margin:12px 0;color:#7A2E2E;font-size:12px">'
+      +'<div style="font-weight:700;margin-bottom:6px">⚠️ Error al cargar el reporte</div>'
+      +'<div style="font-family:monospace;font-size:11px;word-break:break-word">'+_esc(d.reporteTCError)+'</div>'
+      +'<div style="margin-top:10px;font-size:11px;color:#555">Manda este mensaje si necesitas apoyo. Prueba con un rango más chico (Hoy o Ayer) mientras tanto.</div>'
+      +'</div>';
   }else if(r&&r.ok){
     var t=r.totales||{};
     var cobColor=t.cobertura>=50?"#0F6E56":(t.cobertura>=25?"#BA7517":"#A32D2D");
@@ -814,7 +825,7 @@ function buildReporteTCModal(){
       });
     }
   }else{
-    body='<div style="text-align:center;padding:2rem;color:#A32D2D">Error al cargar el reporte</div>';
+    body='<div style="text-align:center;padding:2rem;color:#888">Sin datos para mostrar</div>';
   }
 
   return '<div id="mkmReporteTCBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1010;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
