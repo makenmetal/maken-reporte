@@ -297,6 +297,13 @@ var S = {
     diagOpen:false,
     diagLoading:false,
     diagData:null,
+    // v11.21: Reporte diario de mediciones TC
+    reporteTCOpen:false,
+    reporteTCLoading:false,
+    reporteTCData:null,
+    reporteTCPeriodo:"hoy",   // periodo independiente del dashboard
+    reporteTCDesde:"",
+    reporteTCHasta:"",
     piezaModalCache:{}  // cache local, invalida al cambiar filtros del dashboard
   },
   miturno:{fecha:getFechaHoy(),turno:getTurno(),loading:false,data:null},
@@ -687,6 +694,141 @@ function limpiarCacheDash(){
     cargarDashboard();
   });
 }
+
+// v11.21: Reporte diario de mediciones TC
+function abrirReporteTC(){
+  S.dashboard.reporteTCOpen=true;
+  // Por defecto usar el periodo actual del dashboard
+  S.dashboard.reporteTCPeriodo=S.dashboard.periodo||"hoy";
+  S.dashboard.reporteTCDesde=S.dashboard.desde||"";
+  S.dashboard.reporteTCHasta=S.dashboard.hasta||"";
+  cargarReporteTC();
+}
+function cerrarReporteTC(){
+  S.dashboard.reporteTCOpen=false;
+  S.dashboard.reporteTCData=null;
+  render();
+}
+function cargarReporteTC(){
+  S.dashboard.reporteTCLoading=true;
+  render();
+  var d=S.dashboard;
+  var params={action:"reporteMediciones",periodo:d.reporteTCPeriodo};
+  if(d.reporteTCPeriodo==="custom"){params.desde=d.reporteTCDesde;params.hasta=d.reporteTCHasta;}
+  apiGet(params)
+    .then(function(r){
+      S.dashboard.reporteTCData=r;
+      S.dashboard.reporteTCLoading=false;
+      render();
+    })
+    .catch(function(){
+      S.dashboard.reporteTCLoading=false;
+      render();
+    });
+}
+function reporteTCSetPeriodo(p){
+  S.dashboard.reporteTCPeriodo=p;
+  if(p!=="custom"){cargarReporteTC();}
+  else{render();}
+}
+function reporteTCAplicarRango(){
+  var d=document.getElementById("mkmRepTCDesde");
+  var h=document.getElementById("mkmRepTCHasta");
+  if(!d||!h||!d.value||!h.value){alert("Selecciona ambas fechas");return;}
+  S.dashboard.reporteTCDesde=d.value;
+  S.dashboard.reporteTCHasta=h.value;
+  cargarReporteTC();
+}
+function buildReporteTCModal(){
+  var d=S.dashboard;
+  var r=d.reporteTCData;
+  var pBtn=function(k,l){
+    var sel=d.reporteTCPeriodo===k;
+    return '<button class="mkm-rep-tc-per" data-mkm-per="'+k+'" style="padding:6px 10px;border:1px solid '+(sel?"#4A2E8B":"#ddd")+';background:'+(sel?"#EDE7F6":"#fff")+';color:'+(sel?"#4A2E8B":"#666")+';border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">'+l+'</button>';
+  };
+  var selectores='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+    +pBtn("hoy","Hoy")+pBtn("ayer","Ayer")+pBtn("semana","Semana")+pBtn("mes","Mes")+pBtn("custom","Rango")
+    +'</div>';
+  if(d.reporteTCPeriodo==="custom"){
+    selectores+='<div style="display:flex;gap:8px;align-items:end;margin-bottom:12px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:120px"><label style="font-size:11px;color:#666;display:block">Desde</label>'
+      +'<input type="date" id="mkmRepTCDesde" value="'+_esc(d.reporteTCDesde)+'" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:6px"></div>'
+      +'<div style="flex:1;min-width:120px"><label style="font-size:11px;color:#666;display:block">Hasta</label>'
+      +'<input type="date" id="mkmRepTCHasta" value="'+_esc(d.reporteTCHasta)+'" style="width:100%;padding:6px;border:1px solid #ccc;border-radius:6px"></div>'
+      +'<button id="btnRepTCAplicar" style="padding:7px 12px;background:#4A2E8B;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer">Aplicar</button>'
+      +'</div>';
+  }
+
+  var body="";
+  if(d.reporteTCLoading){
+    body='<div style="text-align:center;padding:2rem;color:#888">Cargando reporte...</div>';
+  }else if(r&&r.ok){
+    var t=r.totales||{};
+    var cobColor=t.cobertura>=50?"#0F6E56":(t.cobertura>=25?"#BA7517":"#A32D2D");
+    // KPIs superiores
+    body+='<div style="background:#F5F5F3;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#666">📅 <b>'+_esc(r.rangoLabel||"")+'</b></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">'
+      +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center"><div style="font-size:9px;color:#888;font-weight:700;letter-spacing:0.5px">DÍAS</div><div style="font-size:18px;font-weight:700">'+t.dias+'</div></div>'
+      +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center"><div style="font-size:9px;color:#888;font-weight:700;letter-spacing:0.5px">COMBINACIONES</div><div style="font-size:18px;font-weight:700">'+t.combinaciones+'</div></div>'
+      +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center"><div style="font-size:9px;color:#888;font-weight:700;letter-spacing:0.5px">CON MEDICIÓN</div><div style="font-size:18px;font-weight:700;color:#0F6E56">'+t.conMedicion+'</div></div>'
+      +'<div style="background:#fff;border:1px solid #eee;border-radius:8px;padding:8px;text-align:center"><div style="font-size:9px;color:#888;font-weight:700;letter-spacing:0.5px">COBERTURA</div><div style="font-size:18px;font-weight:700;color:'+cobColor+'">'+t.cobertura+'%</div></div>'
+      +'</div>';
+
+    if(r.dias.length===0){
+      body+='<div style="text-align:center;padding:2rem;color:#888;font-size:13px">Sin actividad en este periodo</div>';
+    }else{
+      r.dias.forEach(function(dia){
+        body+='<div style="margin-bottom:16px">'
+          +'<div style="background:#4A2E8B;color:#fff;padding:8px 12px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700">📅 '+_esc(dia.fechaLegible)+' <span style="opacity:0.7;font-weight:normal">· '+_esc(dia.fecha)+'</span></div>'
+          +'<div style="border:1px solid #EDE7F6;border-top:none;border-radius:0 0 8px 8px;padding:8px">';
+        dia.maquinas.forEach(function(m){
+          body+='<div style="margin-bottom:10px;padding:8px 10px;background:#fafaf9;border-radius:6px">'
+            +'<div style="font-size:12px;font-weight:700;color:#4A2E8B;margin-bottom:6px">'+_esc(m.maquina)+'</div>'
+            +'<div style="display:grid;grid-template-columns:2fr 40px 50px 55px 55px;gap:6px;padding:4px 0 4px 0;font-size:9px;color:#888;font-weight:700;letter-spacing:0.5px;border-bottom:1px solid #eee">'
+            +'<div>PARTE · OP</div><div style="text-align:right">PZAS</div><div style="text-align:right">CAT</div><div style="text-align:right">MEDIDO</div><div>ING.</div>'
+            +'</div>';
+          m.partes.forEach(function(p){
+            var catTxt=p.tcCatalogo!==null?p.tcCatalogo.toFixed(2):'—';
+            var medTxt,medColor,ingTxt;
+            if(p.medicion){
+              medTxt=p.medicion.tc.toFixed(2);
+              medColor="#0F6E56";
+              ingTxt=_esc(p.medicion.ingeniero||"").split(" ")[0].substring(0,10);
+              if(p.medicion.numMediciones>1){medTxt+='<span style="font-size:9px;color:#888"> ('+p.medicion.numMediciones+')</span>';}
+            }else{
+              medTxt='—';
+              medColor="#A32D2D";
+              ingTxt='<span style="color:#ccc">—</span>';
+            }
+            body+='<div style="display:grid;grid-template-columns:2fr 40px 50px 55px 55px;gap:6px;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:12px;align-items:center">'
+              +'<div><b>'+_esc(p.noParte)+'</b> · op '+_esc(p.operacion)+'</div>'
+              +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:'+(p.piezas===0?"#ccc":"#333")+'">'+p.piezas+'</div>'
+              +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:#0C447C;font-weight:600">'+catTxt+'</div>'
+              +'<div style="text-align:right;font-variant-numeric:tabular-nums;color:'+medColor+';font-weight:700">'+medTxt+'</div>'
+              +'<div style="font-size:10px;color:#666">'+ingTxt+'</div>'
+              +'</div>';
+          });
+          body+='</div>';
+        });
+        body+='</div></div>';
+      });
+    }
+  }else{
+    body='<div style="text-align:center;padding:2rem;color:#A32D2D">Error al cargar el reporte</div>';
+  }
+
+  return '<div id="mkmReporteTCBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1010;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;margin-top:20px;padding:20px 22px;max-height:88vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<div><div style="font-size:16px;font-weight:700">📋 Reporte de mediciones TC</div>'
+    +'<div style="font-size:11px;color:#888;margin-top:2px">Qué partes se corrieron y qué midió ingeniería</div></div>'
+    +'<button id="btnCerrarReporteTC" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +selectores
+    +body
+    +'</div></div>';
+}
+
 function buildDiagModal(){
   var d=S.dashboard;
   var body="";
@@ -1543,8 +1685,13 @@ function buildDashboard(){
   if(d.diagOpen){
     diagModal=buildDiagModal();
   }
+  // v11.21: Modal de reporte TC
+  var reporteTCModal="";
+  if(d.reporteTCOpen){
+    reporteTCModal=buildReporteTCModal();
+  }
 
-  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal+busquedaModal+diagModal;
+  return wrapDashboard(controles+kpis+resumenCard+grid,periodoLabel)+modal+piezaModalHtml+selectorModal+ayudaModal+busquedaModal+diagModal+reporteTCModal;
 }
 
 function wrapDashboard(content,periodoLabel){
@@ -1554,6 +1701,7 @@ function wrapDashboard(content,periodoLabel){
     +'<span style="font-size:12px;color:#888">Eficiencia · '+periodoLabel+'</span></div>'
     +'<div style="display:flex;align-items:center;gap:6px" class="mkm-header-buttons">'
     +'<button id="btnBuscarParte" style="font-size:14px;background:#E1F5EE;border:1px solid #B8E4CF;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0F6E56;font-weight:600" title="Buscar por número de parte">🔍 Parte</button>'
+    +'<button id="btnReporteTC" style="font-size:14px;background:#EDE7F6;border:1px solid #C9BEE0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#4A2E8B;font-weight:600" title="Reporte diario de mediciones TC del ingeniero">📋 TC</button>'
     +'<button id="btnDiagDash" style="font-size:14px;background:#FAEEDA;border:1px solid #EEDCB3;border-radius:8px;cursor:pointer;padding:6px 10px;color:#854F0B;font-weight:600" title="Diagnóstico: qué reportes lee la app">🔧</button>'
     +'<button id="btnExportarPDF" style="font-size:14px;background:#E6F1FB;border:1px solid #B4D3EE;border-radius:8px;cursor:pointer;padding:6px 10px;color:#0C447C;font-weight:600" title="Exportar / Imprimir como PDF">📄 PDF</button>'
     +'<button id="btnAyudaDash" style="font-size:14px;background:#f5f5f3;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;padding:6px 10px;color:#555;font-weight:600" title="Reglas y fórmulas del dashboard">? Manual</button>'
@@ -2317,21 +2465,24 @@ function buildAyudaDashModal(){
 
   // Sección 2: Fórmula
   body+=sec("Cálculo de la eficiencia",
-    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">La eficiencia mide qué tan bien se usó el tiempo <b>realmente disponible</b> para producir.</p>'
-    +formula("Eficiencia % = (Horas de Producción / Horas Disponibles) × 100")
-    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas de Producción</b> se calculan por cada reporte:</p>'
+    '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 6px">La eficiencia mide qué tan bien se usó el tiempo <b>realmente disponible</b> para operar (producción + montaje normal).</p>'
+    +formula("Eficiencia % = (Horas Operadas / Horas Disponibles) × 100")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Operadas</b> = producción + montaje normal (setup ≤ 1.5h por reporte):</p>'
+    +formula("Horas Operadas = Horas Producción + Horas Montaje")
+    +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Producción</b> se calculan por cada reporte:</p>'
     +formula("Horas Producción = (Piezas × TiempoCiclo del catálogo) / 60")
     +'<p style="font-size:12px;color:#555;margin:8px 0 4px"><b>Horas Disponibles</b> descuentan el manto (porque la máquina no estaba operativa):</p>'
     +formula("Horas Disponibles = (9.5h × N° turnos) − Horas Manto")
-    +'<p style="font-size:11px;color:#888;margin-top:8px">Ejemplo: máquina con 2 turnos (19h), 3h de manto, produjo 12h estándar → <b>Eficiencia = 12/(19−3) = 75%</b></p>'
+    +'<p style="font-size:11px;color:#888;margin-top:8px">⚠️ El <b>sobre-setup</b> (setup que excede 1.5h por reporte) NO cuenta como operado.</p>'
+    +'<p style="font-size:11px;color:#888;margin-top:8px">Ejemplo: 2 turnos (19h), 3h de manto, 12h producción + 1h montaje → <b>Eficiencia = 13/(19−3) = 81%</b></p>'
   );
 
   // Sección 3: Composición de las 9.5h
   body+=sec("Distribución de las 9.5 horas por turno",
     '<p style="font-size:12px;color:#555;line-height:1.5;margin:0 0 10px">Cada turno se compone de estas 5 categorías (la barra de colores en cada tarjeta):</p>'
-    +catItem("#1D9E75","Producción","Tiempo estándar equivalente a las piezas producidas.")
-    +catItem("#888780","Montaje","Horas de setup hasta <b>1.5h</b> por reporte. Es tiempo operativo/necesario, NO penaliza.")
-    +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. Se contabilizan como tiempo perdido.")
+    +catItem("#1D9E75","Producción","Tiempo estándar equivalente a las piezas producidas. <b>Cuenta como operado.</b>")
+    +catItem("#888780","Montaje","Horas de setup hasta <b>1.5h</b> por reporte. <b>Cuenta como operado.</b>")
+    +catItem("#EF9F27","Sobre-setup","Horas de setup que <b>exceden 1.5h</b> por reporte. NO cuenta como operado (tiempo perdido).")
     +catItem("#D4544E","Manto","Horas registradas en reportes tipo Mantenimiento. Se <b>descuentan del denominador</b>.")
     +catItem("#F0997B","Ocioso","Horas sin justificar: 9.5h menos todo lo anterior. Refleja tiempo muerto o subutilizado.")
   );
@@ -2644,6 +2795,18 @@ function bindResumen(){
   if(bgDiag)bgDiag.addEventListener("click",function(e){if(e.target.id==="mkmDiagBg")cerrarDiagnostico();});
   var bLimp=document.getElementById("btnLimpiarCache");
   if(bLimp)bLimp.addEventListener("click",limpiarCacheDash);
+  // v11.21: Reporte TC
+  var bRepTC=document.getElementById("btnReporteTC");
+  if(bRepTC)bRepTC.addEventListener("click",abrirReporteTC);
+  var bRepTCCer=document.getElementById("btnCerrarReporteTC");
+  if(bRepTCCer)bRepTCCer.addEventListener("click",cerrarReporteTC);
+  var bgRepTC=document.getElementById("mkmReporteTCBg");
+  if(bgRepTC)bgRepTC.addEventListener("click",function(e){if(e.target.id==="mkmReporteTCBg")cerrarReporteTC();});
+  document.querySelectorAll(".mkm-rep-tc-per").forEach(function(el){
+    el.addEventListener("click",function(){reporteTCSetPeriodo(el.dataset.mkmPer);});
+  });
+  var bRepTCAp=document.getElementById("btnRepTCAplicar");
+  if(bRepTCAp)bRepTCAp.addEventListener("click",reporteTCAplicarRango);
 }
 
 // ============================================================
