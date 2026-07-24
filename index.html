@@ -250,8 +250,10 @@ var S = {
   },
   // Dashboard de eficiencia por máquina (v11.9)
   dashboard:{
+    // v11.33: Vista actual — "maquinas" (default) o "operadores"
+    vista:"maquinas",
     periodo:"hoy",       // "hoy" | "semana" | "mes" | "custom"
-    area:"all",          // "all" | nombre de área
+    area:"all",          // "all" | nombre de área (solo aplica a vista=maquinas)
     turno:"all",         // "all" | "1ro" | "3ro"
     orden:"eff-desc",    // "eff-desc" | "eff-asc" | "pzas"
     desde:"",            // solo si periodo=custom (YYYY-MM-DD)
@@ -259,10 +261,15 @@ var S = {
     // Selección múltiple de máquinas — [] = todas (default)
     maquinas:[],
     catalogoMaquinas:null,  // catálogo completo (cargado on-demand)
-    // Estado del selector modal
+    // v11.33: Selección múltiple de operadores para vista operador
+    operadores:[],       // [] = todos con actividad
+    // Estado del selector modal (aplica al selector actual: máquinas u operadores según vista)
     selectorMaqOpen:false,
     selectorMaqBusqueda:"",
     selectorMaqSeleccion:[],  // selección temporal antes de aplicar
+    // v11.33: Modal de detalle del operador
+    opModal:{ numero:"", nombre:"", loading:false, data:null },
+    opModalCache:{},
     // Modal de manual/ayuda con reglas y fórmulas
     ayudaOpen:false,
     loading:false,
@@ -462,20 +469,33 @@ function cargarResumen(){
 function cargarDashboard(){
   var d=S.dashboard;
   // v11.9/v11.10: Al cambiar filtros/recargar, invalidamos los cachés locales
-  // porque los resultados dependen del rango/turno/filtro actual
   d.maqModalCache={};
   d.piezaModalCache={};
-  // v11.9: NO limpiamos d.data — así el overlay puede mostrar la vista previa
-  // mientras carga. Solo se limpia si la primera carga aún no ha ocurrido.
+  d.opModalCache={};
   d.loading=true;
   render();
-  var params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area,turno:d.turno};
-  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
-  // Si hay máquinas específicas seleccionadas, incluirlas en la petición
-  if(d.maquinas&&d.maquinas.length>0){params.maquinas=d.maquinas.join(",");}
+  var params;
+  if(d.vista==="operadores"){
+    // v11.33: Vista por operador
+    params={action:"dashboardEfOperador",periodo:d.periodo,turno:d.turno};
+    if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+    if(d.operadores&&d.operadores.length>0){params.operadores=d.operadores.join(",");}
+  }else{
+    // Vista por máquina (default)
+    params={action:"dashboardEficiencia",periodo:d.periodo,area:d.area,turno:d.turno};
+    if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+    if(d.maquinas&&d.maquinas.length>0){params.maquinas=d.maquinas.join(",");}
+  }
   apiGet(params)
     .then(function(r){S.dashboard.data=r;S.dashboard.loading=false;render();})
     .catch(function(){S.dashboard.data=null;S.dashboard.loading=false;render();});
+}
+// v11.33: Toggle de vista Máquinas / Operadores
+function setDashboardVista(v){
+  if(S.dashboard.vista===v)return;
+  S.dashboard.vista=v;
+  S.dashboard.data=null;  // limpiar data anterior porque cambia el shape
+  cargarDashboard();
 }
 function setDashboardPeriodo(p){
   S.dashboard.periodo=p;
@@ -536,6 +556,34 @@ function abrirModalMaquina(maq){
 }
 function cerrarModalMaquina(){
   S.dashboard.maqModal={maquina:"",loading:false,data:null};
+  render();
+}
+// v11.33: Modal del operador
+function abrirModalOperador(num,nombre){
+  var d=S.dashboard;
+  var cacheKey=num+"|"+d.periodo+"|"+d.turno+"|"+(d.desde||"")+"|"+(d.hasta||"");
+  var cached=(d.opModalCache||{})[cacheKey];
+  if(cached){
+    S.dashboard.opModal={numero:num,nombre:nombre,loading:false,data:cached};
+    render();
+    return;
+  }
+  S.dashboard.opModal={numero:num,nombre:nombre,loading:true,data:null};
+  render();
+  var params={action:"dashboardEfOperadorDetalle",numero:num,periodo:d.periodo,turno:d.turno};
+  if(d.periodo==="custom"){params.desde=d.desde;params.hasta=d.hasta;}
+  apiGet(params)
+    .then(function(r){
+      if(!S.dashboard.opModalCache)S.dashboard.opModalCache={};
+      S.dashboard.opModalCache[cacheKey]=r;
+      S.dashboard.opModal.data=r;
+      S.dashboard.opModal.loading=false;
+      render();
+    })
+    .catch(function(){S.dashboard.opModal.loading=false;render();});
+}
+function cerrarModalOperador(){
+  S.dashboard.opModal={numero:"",nombre:"",loading:false,data:null};
   render();
 }
 // v11.11: Detalle por parte + operación (global, no por operador/máquina)
@@ -983,6 +1031,14 @@ function cargarCatalogoMaquinas(){
     return S.dashboard.catalogoMaquinas;
   });
 }
+// v11.33: Catálogo de empleados para el selector en vista operador
+function cargarCatalogoOperadores(){
+  if(S.dashboard.catalogoOperadores)return Promise.resolve(S.dashboard.catalogoOperadores);
+  return apiGet({action:"empleados"}).then(function(r){
+    S.dashboard.catalogoOperadores=Array.isArray(r)?r:[];
+    return S.dashboard.catalogoOperadores;
+  });
+}
 // Helper: preserva la posición del scroll de la lista antes/después de render()
 function _renderPreservandoScroll(){
   var lista=document.getElementById("mkmSelMaqLista");
@@ -997,12 +1053,18 @@ function _renderPreservandoScroll(){
   }
 }
 function abrirSelectorMaquinas(){
-  // Copiar la selección actual como estado temporal (para permitir cancelar)
-  S.dashboard.selectorMaqSeleccion=S.dashboard.maquinas.slice();
+  // v11.33: Selector operativo sobre máquinas u operadores según vista actual
+  var d=S.dashboard;
+  var lista=(d.vista==="operadores")?(d.operadores||[]):(d.maquinas||[]);
+  S.dashboard.selectorMaqSeleccion=lista.slice();
   S.dashboard.selectorMaqBusqueda="";
   S.dashboard.selectorMaqOpen=true;
   render();
-  cargarCatalogoMaquinas().then(function(){render();});
+  if(d.vista==="operadores"){
+    cargarCatalogoOperadores().then(function(){render();});
+  }else{
+    cargarCatalogoMaquinas().then(function(){render();});
+  }
 }
 function cerrarSelectorMaquinas(){
   S.dashboard.selectorMaqOpen=false;
@@ -1047,13 +1109,21 @@ function actualizarBusquedaMaq(){
   },0);
 }
 function aplicarSeleccionMaquinas(){
-  S.dashboard.maquinas=S.dashboard.selectorMaqSeleccion.slice();
+  // v11.33: Aplica sobre máquinas u operadores según vista actual
+  if(S.dashboard.vista==="operadores"){
+    S.dashboard.operadores=S.dashboard.selectorMaqSeleccion.slice();
+  }else{
+    S.dashboard.maquinas=S.dashboard.selectorMaqSeleccion.slice();
+  }
   S.dashboard.selectorMaqOpen=false;
   cargarDashboard();
 }
 function limpiarSeleccionMaquinasActiva(){
-  // Reset rápido: limpia la selección aplicada (vuelve a "todas")
-  S.dashboard.maquinas=[];
+  if(S.dashboard.vista==="operadores"){
+    S.dashboard.operadores=[];
+  }else{
+    S.dashboard.maquinas=[];
+  }
   cargarDashboard();
 }
 function cargarMiTurno(){
@@ -1509,8 +1579,18 @@ function _effColor(e){
 function buildDashboard(){
   var d=S.dashboard;
   var p=d.periodo;
+  var esOperador=d.vista==="operadores";
   var labels={hoy:"Hoy",ayer:"Ayer",semana:"Esta semana",mes:"Este mes",custom:"Rango personalizado"};
   var periodoLabel=labels[p]||"Hoy";
+
+  // v11.33: Toggle Máquinas / Operadores
+  var vistaBtn=function(v,txt,ico){
+    var act=d.vista===v;
+    return '<button data-dvista="'+v+'" style="flex:1;padding:10px 4px;border:none;border-radius:8px;font-size:13px;font-weight:'+(act?'700':'500')+';cursor:pointer;background:'+(act?'#333':'#fff')+';color:'+(act?'#fff':'#555')+';box-shadow:'+(act?'none':'0 0 0 1px #e0e0e0')+'">'+ico+' '+txt+'</button>';
+  };
+  var toggleVista='<div style="display:flex;gap:5px;margin-bottom:12px">'
+    +vistaBtn('maquinas','Máquinas','⚙️')+vistaBtn('operadores','Operadores','👤')
+    +'</div>';
 
   // --- Selector de periodo (5 opciones) ---
   var perBtn=function(per,txt){
@@ -1539,13 +1619,15 @@ function buildDashboard(){
       +'</div>';
   }
 
-  // --- Botón de selector múltiple de máquinas ---
-  var nMaqSel=(d.maquinas||[]).length;
-  var maqBtnLabel=nMaqSel>0?("Máquinas: "+nMaqSel+" ▾"):"Máquinas: Todas ▾";
-  var maqBtnStyle=nMaqSel>0
+  // --- Botón de selector múltiple (máquinas u operadores según vista) ---
+  var listaSel=esOperador?(d.operadores||[]):(d.maquinas||[]);
+  var nSel=listaSel.length;
+  var etiqueta=esOperador?"Operadores":"Máquinas";
+  var maqBtnLabel=nSel>0?(etiqueta+": "+nSel+" ▾"):(etiqueta+": Todos ▾");
+  var maqBtnStyle=nSel>0
     ?'padding:7px 12px;font-size:12px;border-radius:8px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;font-weight:600;cursor:pointer'
     :'padding:7px 12px;font-size:12px;border-radius:8px;border:1px solid #e0e0e0;background:#fff;color:#555;cursor:pointer';
-  var maqLimpiarBtn=nMaqSel>0
+  var maqLimpiarBtn=nSel>0
     ?'<button id="btnLimpiarMaqSel" style="padding:6px 10px;font-size:11px;border-radius:6px;border:none;background:#f5f5f3;color:#888;cursor:pointer" title="Limpiar selección">✕</button>'
     :'';
   var selMaq='<div style="display:flex;gap:6px;flex:1;min-width:0">'
@@ -1554,6 +1636,8 @@ function buildDashboard(){
     +'</div>';
 
   // --- Selector de área + turno + orden ---
+  // v11.33: nSel es la selección múltiple actual (máquinas o operadores según vista)
+  var nMaqSel=nSel;
   var areas=["all","Torno","Centro de Maquinado","Bosses","Rectificado Exterior","Rectificado Interior","Corte","Ensamble","Soldadura","Detallado","Avellanado","Roscado"];
   var areaOptions=areas.map(function(a){
     var lbl=a==="all"?"Todas las áreas":a;
@@ -1576,7 +1660,10 @@ function buildDashboard(){
     +'</div>';
 
   var filtroRow1='<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'+selMaq+'</div>';
-  var filtroRow2='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">'+selArea+selTurno+'</div>';
+  // v11.33: En vista operador no aplica filtro de área
+  var filtroRow2=esOperador
+    ?'<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;justify-content:flex-end">'+selTurno+'</div>'
+    :'<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">'+selArea+selTurno+'</div>';
 
   var ordBtn=function(o,txt){
     var act=d.orden===o;
@@ -1586,7 +1673,7 @@ function buildDashboard(){
     +ordBtn('eff-desc','Efic ↓')+ordBtn('eff-asc','Efic ↑')+ordBtn('pzas','Pzas ↓')
     +'</div>';
 
-  var controles=selPeriodo+rangoHtml+rangoBadge+filtroRow1+filtroRow2+ordenRow;
+  var controles=toggleVista+selPeriodo+rangoHtml+rangoBadge+filtroRow1+filtroRow2+ordenRow;
 
   if(d.loading){
     // v11.9: Si ya hay datos previos, mostrarlos con un overlay de loading
@@ -1610,11 +1697,14 @@ function buildDashboard(){
       else if(d.orden==="eff-asc")cardsPrev.sort(_sortEffAscP);
       else cardsPrev.sort(function(a,b){return (b.piezas||0)-(a.piezas||0);});
       var resumenPrev=dashResumenCard(d.data,cardsPrev);
-      var gridPrev=cardsPrev.length===0?"":'<div class="mkm-dash-grid">'+cardsPrev.map(dashMaqCard).join("")+'</div>';
+      var cardFnPrev=esOperador?dashOpCard:dashMaqCard;
+      var gridPrev=cardsPrev.length===0?"":'<div class="mkm-dash-grid">'+cardsPrev.map(cardFnPrev).join("")+'</div>';
+      var kpiLabelPrev=esOperador?"OPERADORES":"MÁQUINAS";
+      var kpiValPrev=esOperador?(d.data.numOperadores||0):(d.data.numMaquinas||0);
       var kpisPrev='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">'
         +dashKpi("EFIC GLOBAL",(d.data.effGlobal||0)+"%","#1D9E75")
         +dashKpi("PIEZAS",(d.data.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
-        +dashKpi("MÁQUINAS",d.data.numMaquinas||0,"#555")
+        +dashKpi(kpiLabelPrev,kpiValPrev,"#555")
         +dashKpi("HRS DISP",(d.data.totalHrsDisp||0).toFixed(0)+"h","#555")
         +'</div>';
       var overlay='<div style="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:100;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);border-radius:20px;padding:8px 16px;font-size:12px;color:#555;display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border:2px solid #ccc;border-top-color:#1D9E75;border-radius:50%;display:inline-block;animation:mkmSpin 0.8s linear infinite"></span>Actualizando...</div><style>@keyframes mkmSpin{to{transform:rotate(360deg)}}</style>';
@@ -1630,10 +1720,12 @@ function buildDashboard(){
   }
 
   // --- KPIs globales ---
+  var kpiLabel=esOperador?"OPERADORES":"MÁQUINAS";
+  var kpiVal=esOperador?(data.numOperadores||0):(data.numMaquinas||0);
   var kpis='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">'
     +dashKpi("EFIC GLOBAL",(data.effGlobal||0)+"%","#1D9E75")
     +dashKpi("PIEZAS",(data.totalPiezas||0).toLocaleString("es-MX"),"#1D9E75")
-    +dashKpi("MÁQUINAS",data.numMaquinas||0,"#555")
+    +dashKpi(kpiLabel,kpiVal,"#555")
     +dashKpi("HRS DISP",(data.totalHrsDisp||0).toFixed(0)+"h","#555")
     +'</div>';
 
@@ -1663,13 +1755,19 @@ function buildDashboard(){
   if(cards.length===0){
     grid='<div style="background:#f8fafc;border-radius:10px;padding:40px 20px;text-align:center;color:#888;font-size:13px">Sin actividad en el filtro seleccionado</div>';
   }else{
-    grid='<div class="mkm-dash-grid">'+cards.map(dashMaqCard).join("")+'</div>';
+    // v11.33: Tarjetas según vista
+    var cardFn=esOperador?dashOpCard:dashMaqCard;
+    grid='<div class="mkm-dash-grid">'+cards.map(cardFn).join("")+'</div>';
   }
 
   // --- Modal (si hay máquina seleccionada) ---
   var modal="";
   if(d.maqModal&&d.maqModal.maquina){
     modal=buildMaquinaModal();
+  }
+  // v11.33: Modal del operador
+  if(d.opModal&&d.opModal.numero){
+    modal=buildOperadorModal();
   }
   // v11.10/v11.11: Modal apilado de detalle por parte + operación
   var piezaModalHtml="";
@@ -1920,6 +2018,91 @@ function dashMaqCard(c){
     +'</div>';
 }
 
+// v11.33: Tarjeta individual por operador (misma lógica visual, sin Manto)
+function dashOpCard(c){
+  // Sin actividad
+  if(c.sinActividad){
+    return '<div class="mkm-op-card mkm-mach-empty" data-mkm-op="'+_esc(c.numero)+'" style="background:#fafaf9;border-radius:12px;border:1px dashed #ddd;padding:14px 16px;margin-bottom:12px;cursor:pointer;opacity:0.7">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
+      +'<div style="font-size:15px;font-weight:600;color:#666">'+_esc(c.numero)+' · '+_esc(c.nombre||"")+'</div>'
+      +'<div style="font-size:11px;color:#aaa">Sin actividad</div>'
+      +'</div>'
+      +'<div style="text-align:center;padding:14px 0;border-radius:8px;background:#f5f5f3">'
+      +'<div style="font-size:36px;font-weight:600;color:#bbb;line-height:1;letter-spacing:-1px">0%</div>'
+      +'<div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px">SIN REPORTES EN PERIODO</div>'
+      +'</div></div>';
+  }
+
+  var col=_effColor(c.eff);
+  var total=c.totalHrs||0.001;
+  var hProdVis=(c.hProd||0)+(c.hOtro||0);
+  var pP=(hProdVis/total*100);
+  var pS=(c.hSet/total*100);
+  var pO=(c.hOver/total*100);
+  var pI=(c.hIdle/total*100);
+  var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_IDLE="#F0997B";
+
+  // Barra sin Manto en vista operador
+  var bar='<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:#f5f5f3;margin-bottom:8px">'
+    +(pP>0?'<div style="width:'+pP+'%;background:'+COL_PROD+'"></div>':'')
+    +(pS>0?'<div style="width:'+pS+'%;background:'+COL_SET+'"></div>':'')
+    +(pO>0?'<div style="width:'+pO+'%;background:'+COL_OVER+'"></div>':'')
+    +(pI>0?'<div style="width:'+pI+'%;background:'+COL_IDLE+'"></div>':'')
+    +'</div>';
+
+  var legendRow=function(color,lbl,val,pct){
+    return '<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="display:flex;align-items:center;gap:5px;color:#666;font-size:11px"><span style="width:7px;height:7px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
+      +'<span style="font-size:11px;color:#222"><span style="font-weight:600">'+val.toFixed(1)+'h</span> <span style="color:#888">('+Math.round(pct)+'%)</span></span></div>';
+  };
+  var legend='<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;margin-bottom:12px">'
+    +legendRow(COL_PROD,"Producción",hProdVis,pP)
+    +legendRow(COL_SET,"Montaje",c.hSet,pS)
+    +legendRow(COL_OVER,"Sobre-setup",c.hOver,pO)
+    +legendRow(COL_IDLE,"Ocioso",c.hIdle,pI)
+    +'</div>';
+
+  var turnosStr=(c.turnosPresentes&&c.turnosPresentes.length)?c.turnosPresentes.join(" · "):(c.turnos+" turno"+(c.turnos>1?'s':''));
+  var maqInfo=(c.numMaquinas>0)?(c.numMaquinas+" máquina"+(c.numMaquinas>1?'s':'')):"";
+
+  // Badge de recalibrada (misma lógica que máquina)
+  var recBadge="";
+  if(c.effRecalibrada!==null&&c.effRecalibrada!==undefined){
+    var pConM=c.partesConMedicion||0;
+    var pSinM=c.partesSinMedicion||0;
+    var totalP=pConM+pSinM;
+    var cobPct=totalP>0?Math.round((pConM/totalP)*100):0;
+    if(cobPct>=90){
+      var effRec=c.effRecalibrada;
+      var diff=effRec-c.eff;
+      var recBg="#E6F1FB",recFg="#0C447C",recFlecha="≈";
+      if(diff<-2){recBg="#FCEBEB";recFg="#A32D2D";recFlecha="↓";}
+      else if(diff>2){recBg="#E1F5EE";recFg="#0F6E56";recFlecha="↑";}
+      var diffTxt=(diff>=0?"+":"")+diff;
+      recBadge='<div style="display:flex;justify-content:space-between;align-items:center;background:'+recBg+';border-radius:6px;padding:6px 10px;margin-top:-6px;margin-bottom:10px;font-size:11px">'
+        +'<span style="color:'+recFg+';font-weight:600">Recalibrada: <b>'+effRec+'%</b></span>'
+        +'<span style="color:'+recFg+';font-weight:600">'+recFlecha+' '+diffTxt+' pts</span>'
+        +'</div>';
+    }
+  }
+
+  return '<div class="mkm-op-card" data-mkm-op="'+_esc(c.numero)+'" style="background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px;margin-bottom:12px;cursor:pointer">'
+    +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">'
+    +'<div style="font-size:15px;font-weight:600">'+_esc(c.numero)+' · '+_esc(c.nombre||"")+'</div>'
+    +'<div style="font-size:11px;color:#888">'+_esc(turnosStr)+'</div>'
+    +'</div>'
+    +(maqInfo?'<div style="font-size:11px;color:#888;margin-bottom:12px">'+maqInfo+'</div>':'<div style="margin-bottom:8px"></div>')
+    +'<div style="text-align:center;padding:10px 0;margin-bottom:12px;border-radius:8px;background:'+col.bg+'">'
+    +'<div style="font-size:36px;font-weight:600;color:'+col.fg+';line-height:1;letter-spacing:-1px">'+c.eff+'%</div>'
+    +'<div style="font-size:9px;color:'+col.fg+';margin-top:3px;letter-spacing:0.5px">EFICIENCIA</div>'
+    +'</div>'
+    +recBadge
+    +'<p style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;font-weight:600">Distribución de '+c.totalHrs.toFixed(1)+'h</p>'
+    +bar+legend
+    +'<div style="font-size:10px;color:#999;text-align:center;padding:6px 0 0;border-top:1px solid #f0f0f0;margin-top:4px">Toca para ver detalle</div>'
+    +'</div>';
+}
+
 // Modal de máquina expandida con tendencia diaria
 function buildMaquinaModal(){
   var mm=S.dashboard.maqModal;
@@ -2149,6 +2332,161 @@ function buildMaquinaModal(){
     +'<div><div style="font-size:19px;font-weight:700">'+_esc(mm.maquina)+'</div>'
     +'<div style="font-size:12px;color:#888">'+_esc(mm.data&&mm.data.area||"")+'</div></div>'
     +'<button id="btnCerrarMaqModal" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
+    +'</div>'
+    +body
+    +'</div></div>';
+}
+
+// v11.33: Modal de detalle del operador (tendencia, por turno, por máquina)
+function buildOperadorModal(){
+  var om=S.dashboard.opModal;
+  var body="";
+  if(om.loading){
+    body='<div style="padding:3rem;text-align:center;color:#888">Cargando...</div>';
+  }else if(!om.data||!om.data.ok){
+    body='<div style="padding:3rem;text-align:center;color:#E24B4A">Error al cargar datos del operador</div>';
+  }else{
+    var d=om.data;
+    var res=d.resumen||{};
+    var col=_effColor(res.eff||0);
+
+    // Header
+    var header='<div style="text-align:center;padding:18px 0;margin-bottom:16px;border-radius:12px;background:'+col.bg+'">'
+      +'<div style="font-size:52px;font-weight:700;color:'+col.fg+';line-height:1;letter-spacing:-2px">'+(res.eff||0)+'%</div>'
+      +'<div style="font-size:11px;color:'+col.fg+';margin-top:6px;letter-spacing:0.5px;font-weight:600">EFICIENCIA · '+res.turnos+' turno'+(res.turnos>1?'s':'')+' · '+(res.piezas||0).toLocaleString("es-MX")+' piezas</div>'
+      +'</div>';
+
+    // Eficiencia recalibrada (solo si cobertura ≥ 90%)
+    var efMax="";
+    if(res.effRecalibrada!==null&&res.effRecalibrada!==undefined){
+      var effRec=res.effRecalibrada;
+      var effAct=res.eff||0;
+      var pConM=res.partesConMedicion||0;
+      var pSinM=res.partesSinMedicion||0;
+      var totalP=pConM+pSinM;
+      var cobPct=totalP>0?Math.round((pConM/totalP)*100):0;
+      if(cobPct>=90){
+        var diff=effRec-effAct;
+        var flechaTxt="",flechaColor="#0C447C",mensaje="";
+        if(diff<-2){flechaTxt="↓ "+diff+" pts";flechaColor="#A32D2D";mensaje="Catálogo sobrestima el tiempo por pieza.";}
+        else if(diff>2){flechaTxt="↑ +"+diff+" pts";flechaColor="#0F6E56";mensaje="Catálogo subestima el tiempo por pieza.";}
+        else{flechaTxt="≈ "+(diff>=0?"+":"")+diff+" pts";flechaColor="#0C447C";mensaje="Catálogo bien calibrado.";}
+        efMax='<div style="background:#fafaf9;border-radius:12px;border-left:4px solid #185FA5;padding:12px 16px;margin-bottom:16px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:baseline">'
+          +'<div><div style="font-size:11px;color:#888;font-weight:700;letter-spacing:0.5px">EFICIENCIA RECALIBRADA</div>'
+          +'<div style="font-size:10px;color:#888;margin-top:2px">'+mensaje+' <span style="color:#aaa">· '+pConM+'/'+totalP+' partes ('+cobPct+'%)</span></div></div>'
+          +'<div style="text-align:right"><div style="font-size:28px;font-weight:700;color:#185FA5;line-height:1">'+effRec+'%</div>'
+          +'<div style="font-size:11px;color:'+flechaColor+';font-weight:600;margin-top:2px">'+flechaTxt+'</div></div>'
+          +'</div></div>';
+      }else if(totalP>0){
+        efMax='<div style="background:#FAEEDA;border-radius:8px;border-left:3px solid #BA7517;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#854F0B">'
+          +'<b>Recalibración no disponible.</b> Cobertura de mediciones TC: <b>'+cobPct+'%</b> ('+pConM+'/'+totalP+' partes). Se requiere ≥90% para recalibrar.'
+          +'</div>';
+      }
+    }
+
+    // Distribución sin Manto
+    var COL_PROD="#1D9E75", COL_SET="#888780", COL_OVER="#EF9F27", COL_IDLE="#F0997B";
+    var _distrRow=function(color,lbl,val,pct){
+      return '<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<span style="display:flex;align-items:center;gap:5px;color:#666"><span style="width:8px;height:8px;border-radius:2px;background:'+color+'"></span>'+lbl+'</span>'
+        +'<span style="color:#222"><b>'+val.toFixed(1)+'h</b> <span style="color:#888">('+Math.round(pct)+'%)</span></span></div>';
+    };
+    var totHrs=res.totalHrs||0.001;
+    var hProdVis=(res.hProd||0)+(res.hOtro||0);
+    var pP=(hProdVis/totHrs*100),pS=(res.hSet/totHrs*100),pO=(res.hOver/totHrs*100),pI=(res.hIdle/totHrs*100);
+    var buildDistr=function(titulo,badge,sub,vals,pcts,esTotal){
+      var padExt=esTotal?"14px 14px 12px":"10px 12px 10px";
+      var barH=esTotal?"18px":"12px";
+      var htmlBar='<div style="display:flex;height:'+barH+';border-radius:'+(esTotal?"9px":"6px")+';overflow:hidden;background:#f0f0ee;margin-bottom:10px">'
+        +(vals.hProd>0?'<div style="width:'+pcts.pP+'%;background:'+COL_PROD+'"></div>':'')
+        +(vals.hSet>0?'<div style="width:'+pcts.pS+'%;background:'+COL_SET+'"></div>':'')
+        +(vals.hOver>0?'<div style="width:'+pcts.pO+'%;background:'+COL_OVER+'"></div>':'')
+        +(vals.hIdle>0?'<div style="width:'+pcts.pI+'%;background:'+COL_IDLE+'"></div>':'')
+        +'</div>';
+      var badgeHtml=badge?'<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:'+badge.bg+';color:'+badge.fg+';font-weight:600;margin-left:6px">'+badge.txt+'</span>':'';
+      return '<div style="background:'+(esTotal?"#fafaf9":"#fff")+';border-radius:12px;padding:'+padExt+';margin-bottom:'+(esTotal?"14px":"10px")+';border:1px solid '+(esTotal?"#e8e8e6":"#eee")+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'
+        +'<span style="font-size:'+(esTotal?"13px":"12px")+';color:#333;font-weight:700">'+titulo+badgeHtml+'</span>'
+        +'<span style="font-size:11px;color:#888">'+sub+'</span>'
+        +'</div>'+htmlBar
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:12px">'
+        +_distrRow(COL_PROD,"Producción",vals.hProd,pcts.pP)
+        +_distrRow(COL_SET,"Montaje",vals.hSet,pcts.pS)
+        +_distrRow(COL_OVER,"Sobre-setup",vals.hOver,pcts.pO)
+        +_distrRow(COL_IDLE,"Ocioso",vals.hIdle,pcts.pI)
+        +'</div></div>';
+    };
+    var distr='<p style="font-size:13px;color:#333;font-weight:700;margin:0 0 10px">⚙️ Distribución de horas</p>'
+      +buildDistr("Total del periodo",null,totHrs.toFixed(1)+'h totales',
+        {hProd:hProdVis,hSet:res.hSet,hOver:res.hOver,hIdle:res.hIdle},
+        {pP:pP,pS:pS,pO:pO,pI:pI},true);
+    var porTurno=res.porTurno||{};
+    ["1ro","3ro"].forEach(function(t){
+      if(porTurno[t]){
+        var pt=porTurno[t];
+        var pth=pt.totalHrs||0.001;
+        var ptHProdVis=(pt.hProd||0)+(pt.hOtro||0);
+        var ptPcts={pP:(ptHProdVis/pth*100),pS:(pt.hSet/pth*100),pO:(pt.hOver/pth*100),pI:(pt.hIdle/pth*100)};
+        var badgeCol=_effColor(pt.eff||0);
+        distr+=buildDistr("Turno "+t,
+          {bg:badgeCol.bg,fg:badgeCol.fg,txt:(pt.eff||0)+'%'},
+          pt.turnos+" día"+(pt.turnos>1?"s":"")+" · "+(pt.piezas||0).toLocaleString("es-MX")+" pzs",
+          {hProd:ptHProdVis,hSet:pt.hSet,hOver:pt.hOver,hIdle:pt.hIdle},
+          ptPcts,false);
+      }
+    });
+
+    // Sección exclusiva: producción por máquina donde trabajó el operador
+    var porMaq="";
+    var listaMaq=res.porMaquina||[];
+    if(listaMaq.length>0){
+      porMaq='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">🛠️ Producción por máquina <span style="font-size:10px;color:#888;font-weight:500">· '+listaMaq.length+' máquina'+(listaMaq.length>1?'s':'')+'</span></p>'
+        +'<div style="border:1px solid #eee;border-radius:8px;padding:4px 12px">'
+        +listaMaq.map(function(m){
+          var mcol=_effColor(m.eff||0);
+          return '<div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;align-items:center">'
+            +'<div><div style="color:#222;font-weight:600">'+_esc(m.maquina)+'</div>'
+            +'<div style="color:#888;font-size:11px">'+m.turnos+' turno'+(m.turnos>1?'s':'')+' · '+(m.piezas||0).toLocaleString("es-MX")+' pzs</div></div>'
+            +'<div style="text-align:right;color:#666;font-variant-numeric:tabular-nums">'+((m.hProd||0)+(m.hOtro||0)).toFixed(1)+'h</div>'
+            +'<span style="background:'+mcol.bg+';color:'+mcol.fg+';padding:3px 8px;border-radius:10px;font-weight:700;font-size:11px">'+(m.eff||0)+'%</span>'
+            +'</div>';
+        }).join("")+'</div>';
+    }
+
+    // Actividad detallada (mismo layout que máquina, sin badge de Manto)
+    var acts=(res.acts||[]).slice();
+    acts.sort(function(a,b){return (b.hrs||0)-(a.hrs||0);});
+    var actsBlock='<p style="font-size:13px;color:#333;font-weight:700;margin:16px 0 8px">👥 Actividad detallada ('+acts.length+' entrada'+(acts.length!==1?'s':'')+')</p>';
+    if(acts.length===0){
+      actsBlock+='<p style="font-size:12px;color:#aaa;padding:8px 0">Sin producción registrada</p>';
+    }else{
+      actsBlock+='<div style="max-height:240px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px 12px">'
+        +acts.map(function(a){
+          var esOtro=a.esOtro||(String(a.np||"").indexOf("Otro")===0);
+          var horasCell;
+          if(a.sinStd){
+            horasCell='<div style="color:#854F0B;text-align:right;font-size:11px;line-height:1.3">— h<br><span style="background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:3px;font-weight:700;font-size:10px">SIN ESTÁNDAR</span></div>';
+          }else if(esOtro){
+            horasCell='<div style="color:#0C447C;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:3px;font-weight:700;font-size:10px;margin-left:2px">OTRO</span></div>';
+          }else{
+            horasCell='<div style="color:#666;text-align:right;font-variant-numeric:tabular-nums">'+(a.pzas||0).toLocaleString("es-MX")+' pzs<br>'+(a.hrs||0).toFixed(2)+'h</div>';
+          }
+          return '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 6px;border-bottom:1px solid #f5f5f3;font-size:12px;align-items:center">'
+            +'<div><div style="color:'+(a.sinStd?"#854F0B":(esOtro?"#0C447C":"#222"))+';font-weight:500">'+_esc(a.np)+' · op '+_esc(a.op)+'</div></div>'
+            +horasCell+'</div>';
+        }).join("")+'</div>';
+    }
+
+    body=header+efMax+distr+porMaq+actsBlock;
+  }
+
+  var titulo=om.numero+' · '+(om.nombre||'');
+  return '<div id="mkmOpModalBg" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto">'
+    +'<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px 20px;position:relative;box-shadow:0 8px 24px rgba(0,0,0,0.2);margin:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f0f0f0">'
+    +'<div><div style="font-size:20px;font-weight:700;color:#222">'+_esc(titulo)+'</div><div style="font-size:11px;color:#888;margin-top:2px">Operador</div></div>'
+    +'<button id="btnCerrarOpModal" style="background:none;border:none;font-size:24px;color:#888;cursor:pointer;line-height:1;padding:0 4px">×</button>'
     +'</div>'
     +body
     +'</div></div>';
@@ -2641,68 +2979,98 @@ function buildAyudaDashModal(){
 // Modal para selector múltiple de máquinas
 function buildSelectorMaquinasModal(){
   var d=S.dashboard;
-  var cat=d.catalogoMaquinas;
+  var esOperador=d.vista==="operadores";
+  // v11.33: Fuente del catálogo según vista
+  var cat=esOperador?d.catalogoOperadores:d.catalogoMaquinas;
   var body="";
 
   if(!cat){
-    body='<div style="padding:3rem;text-align:center;color:#888">Cargando catálogo de máquinas...</div>';
+    body='<div style="padding:3rem;text-align:center;color:#888">Cargando catálogo de '+(esOperador?"operadores":"máquinas")+'...</div>';
   }else{
     var q=(d.selectorMaqBusqueda||"").toLowerCase();
-    // v11.28: Filtrar Secundarias del dashboard
-    var maqPrincipales=cat.filter(function(m){
-      var t=String(m.tipo||"Principal").trim().toLowerCase();
-      return t!=="secundaria";
-    });
-    // Filtrar por búsqueda
-    var maqFiltradas=maqPrincipales.filter(function(m){
-      if(!q)return true;
-      return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
-    });
-    // Agrupar por área
-    var porArea={};
-    for(var i=0;i<maqFiltradas.length;i++){
-      var ar=maqFiltradas[i].area||"Sin área";
-      if(!porArea[ar])porArea[ar]=[];
-      porArea[ar].push(maqFiltradas[i]);
+    var items;
+    if(esOperador){
+      // Empleados: normalizar campos (numero, nombre)
+      // Sin filtro de tipo (todos los empleados aparecen)
+      items=cat.filter(function(e){
+        if(!q)return true;
+        var num=String(e.numero||"").toLowerCase();
+        var nom=String(e.nombre||"").toLowerCase();
+        return num.indexOf(q)>=0||nom.indexOf(q)>=0;
+      }).map(function(e){
+        return {
+          key:String(e.numero||"").trim(),
+          titulo:String(e.numero||"").trim()+' · '+String(e.nombre||"").trim(),
+          grupo:"" // sin agrupación por área
+        };
+      });
+    }else{
+      // Máquinas: filtrar Secundarias (v11.28)
+      var maqPrincipales=cat.filter(function(m){
+        var t=String(m.tipo||"Principal").trim().toLowerCase();
+        return t!=="secundaria";
+      });
+      items=maqPrincipales.filter(function(m){
+        if(!q)return true;
+        return (m.maquina||"").toLowerCase().indexOf(q)>=0||(m.area||"").toLowerCase().indexOf(q)>=0;
+      }).map(function(m){
+        return {
+          key:String(m.maquina||"").trim(),
+          titulo:String(m.maquina||"").trim(),
+          grupo:String(m.area||"Sin área").trim()
+        };
+      });
     }
 
-    // Buscador + botones de acción rápida
+    // Agrupar
+    var porGrupo={};
+    for(var i=0;i<items.length;i++){
+      var g=items[i].grupo||"";
+      if(!porGrupo[g])porGrupo[g]=[];
+      porGrupo[g].push(items[i]);
+    }
+
+    // Buscador
+    var placeholder=esOperador?"Buscar por número o nombre...":"Buscar máquina o área...";
     var buscador='<div style="position:relative;margin-bottom:12px">'
-      +'<input type="text" id="dashMaqBusq" value="'+_esc(d.selectorMaqBusqueda||"")+'" placeholder="Buscar máquina o área..." '
+      +'<input type="text" id="dashMaqBusq" value="'+_esc(d.selectorMaqBusqueda||"")+'" placeholder="'+placeholder+'" '
       +'style="width:100%;padding:9px 12px 9px 34px;font-size:13px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box">'
       +'<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#aaa">🔍</span>'
       +'</div>';
 
     var accRapidas='<div style="display:flex;gap:6px;margin-bottom:14px">'
-      +'<button id="btnSelTodas" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;flex:1">Limpiar (= todas)</button>'
-      +(q?'<button id="btnSelVisibles" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;flex:1;font-weight:600">Sel. visibles ('+maqFiltradas.length+')</button>':'')
+      +'<button id="btnSelTodas" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;flex:1">Limpiar (= todos)</button>'
+      +(q?'<button id="btnSelVisibles" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;flex:1;font-weight:600">Sel. visibles ('+items.length+')</button>':'')
       +'</div>';
 
-    // Lista agrupada por área
+    // Lista
     var listaHtml="";
-    var areasOrden=Object.keys(porArea).sort();
-    if(areasOrden.length===0){
+    var gruposOrden=Object.keys(porGrupo).sort();
+    if(gruposOrden.length===0){
       listaHtml='<p style="text-align:center;color:#888;padding:2rem">Sin resultados para "'+_esc(d.selectorMaqBusqueda)+'"</p>';
     }else{
-      areasOrden.forEach(function(ar){
-        listaHtml+='<div style="margin-bottom:14px">'
-          +'<p style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee">'+_esc(ar)+' ('+porArea[ar].length+')</p>';
-        porArea[ar].forEach(function(m){
-          var isSel=d.selectorMaqSeleccion.indexOf(m.maquina)>=0;
+      gruposOrden.forEach(function(g){
+        listaHtml+='<div style="margin-bottom:14px">';
+        if(g){
+          listaHtml+='<p style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee">'+_esc(g)+' ('+porGrupo[g].length+')</p>';
+        }
+        porGrupo[g].forEach(function(it){
+          var isSel=d.selectorMaqSeleccion.indexOf(it.key)>=0;
           var check=isSel?'☑':'☐';
           var textColor=isSel?"#0F6E56":"#333";
-          listaHtml+='<div class="mkm-maq-opt" data-mkm-selmaq="'+_esc(m.maquina)+'" style="display:flex;align-items:center;gap:10px;padding:8px 6px;cursor:pointer;border-radius:6px;'+(isSel?'background:#F0FAF6':'')+'">'
+          listaHtml+='<div class="mkm-maq-opt" data-mkm-selmaq="'+_esc(it.key)+'" style="display:flex;align-items:center;gap:10px;padding:8px 6px;cursor:pointer;border-radius:6px;'+(isSel?'background:#F0FAF6':'')+'">'
             +'<span style="font-size:16px;color:'+textColor+'">'+check+'</span>'
-            +'<span style="font-size:13px;color:'+textColor+';font-weight:'+(isSel?'600':'500')+'">'+_esc(m.maquina)+'</span>'
+            +'<span style="font-size:13px;color:'+textColor+';font-weight:'+(isSel?'600':'500')+'">'+_esc(it.titulo)+'</span>'
             +'</div>';
         });
         listaHtml+='</div>';
       });
     }
 
-    // Botón de aplicar
+    // Botón aplicar
     var nSel=d.selectorMaqSeleccion.length;
-    var aplicarLabel=nSel>0?("Aplicar ("+nSel+" máquina"+(nSel>1?"s":"")+")"):"Aplicar (todas)";
+    var etiqueta=esOperador?"operador":"máquina";
+    var aplicarLabel=nSel>0?("Aplicar ("+nSel+" "+etiqueta+(nSel>1?"es":"")+")"):"Aplicar (todos)";
     var aplicarBtn='<div style="position:sticky;bottom:0;background:#fff;padding:12px 0 4px;border-top:1px solid #eee;margin-top:14px">'
       +'<button id="btnAplicarMaqSel" style="width:100%;padding:12px;font-size:14px;font-weight:700;border:none;border-radius:8px;background:#1D9E75;color:#fff;cursor:pointer">'+aplicarLabel+'</button>'
       +'</div>';
@@ -2710,10 +3078,11 @@ function buildSelectorMaquinasModal(){
     body=buscador+accRapidas+'<div id="mkmSelMaqLista" style="max-height:55vh;overflow-y:auto;padding-right:4px">'+listaHtml+'</div>'+aplicarBtn;
   }
 
+  var titulo=esOperador?"Seleccionar operadores":"Seleccionar máquinas";
   return '<div id="mkmSelMaqBg" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1001;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto">'
     +'<div style="background:#fff;border-radius:14px;max-width:500px;width:100%;margin-top:20px;padding:18px 20px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    +'<div style="font-size:16px;font-weight:600">Seleccionar máquinas</div>'
+    +'<div style="font-size:16px;font-weight:600">'+titulo+'</div>'
     +'<button id="btnCerrarSelMaq" style="font-size:24px;color:#666;background:none;border:none;cursor:pointer;padding:4px 10px;line-height:1">×</button>'
     +'</div>'
     +body
@@ -2757,6 +3126,25 @@ function buildVerOpLista(){
 function bindResumen(){
   var bSalir=document.getElementById("btnSalirRes");if(bSalir)bSalir.addEventListener("click",doSalirResumen);
   var bRef=document.getElementById("btnRefreshDash");if(bRef)bRef.addEventListener("click",cargarDashboard);
+  // v11.33: Toggle vista Máquinas/Operadores
+  document.querySelectorAll("[data-dvista]").forEach(function(el){
+    el.addEventListener("click",function(){setDashboardVista(el.dataset.dvista);});
+  });
+  // Tarjetas de operador — click abre modal operador
+  document.querySelectorAll("[data-mkm-op]").forEach(function(el){
+    el.addEventListener("click",function(){
+      var num=el.dataset.mkmOp;
+      // Buscar el nombre en las cards del data actual
+      var nombre="";
+      var cards=(S.dashboard.data&&S.dashboard.data.cards)||[];
+      for(var i=0;i<cards.length;i++){if(cards[i].numero===num){nombre=cards[i].nombre;break;}}
+      abrirModalOperador(num,nombre);
+    });
+  });
+  var bOpCer=document.getElementById("btnCerrarOpModal");
+  if(bOpCer)bOpCer.addEventListener("click",cerrarModalOperador);
+  var bgOp=document.getElementById("mkmOpModalBg");
+  if(bgOp)bgOp.addEventListener("click",function(e){if(e.target.id==="mkmOpModalBg")cerrarModalOperador();});
   // Botones de periodo
   document.querySelectorAll("[data-dperiod]").forEach(function(el){
     el.addEventListener("click",function(){setDashboardPeriodo(el.dataset.dperiod);});
